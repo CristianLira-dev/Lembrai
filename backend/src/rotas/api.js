@@ -1,19 +1,22 @@
 const express = require('express');
-const { autenticar, validarSegredoWebhook } = require('../intermediarios/seguranca');
+const { criarAutenticador, validarSegredoWebhook } = require('../intermediarios/seguranca');
+const { criarServicoAutenticacao } = require('../servicos/servico-autenticacao');
 const { criarControladorAutenticacao } = require('../controladores/autenticacao-controlador');
 const { criarControladorTarefas } = require('../controladores/tarefas-controlador');
 const { criarControladorLembretes } = require('../controladores/lembretes-controlador');
 const { criarControladorWebhook } = require('../controladores/webhook-controlador');
 const { criarControladorPainel } = require('../controladores/painel-controlador');
 
-function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCalendarios, filaMensagens, servicoAssistente }) {
+function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCalendarios, filaMensagens, servicoAssistente, servicoAutenticacao = criarServicoAutenticacao(repositorio) }) {
   const rotas = express.Router();
-  const autenticacao = criarControladorAutenticacao(repositorio);
+  const autenticar = criarAutenticador(servicoAutenticacao);
+  const autenticacao = criarControladorAutenticacao(servicoAutenticacao);
   const tarefas = criarControladorTarefas(servicoTarefas);
   const lembretes = criarControladorLembretes(servicoLembretes);
   const webhook = criarControladorWebhook({ repositorio, filaMensagens, servicoAssistente });
   const painel = criarControladorPainel({ repositorio, servicoCalendarios });
 
+  rotas.use('/autenticacao', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   rotas.post('/autenticacao/cadastro', autenticacao.cadastrar);
   rotas.post('/autenticacao/entrar', autenticacao.entrar);
   rotas.get('/autenticacao/eu', autenticar, autenticacao.eu);

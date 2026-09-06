@@ -5,7 +5,7 @@ import { MarcaLembrai } from '../componentes/MarcaLembrai';
 import { RotuloCampo } from '../componentes/RotuloCampo';
 
 export function PaginaEntrada() {
-  const { entrar } = useAutenticacao();
+  const { entrar, erroSessao } = useAutenticacao();
   const navegar = useNavigate();
   const [dados, setDados] = useState({ email: '', senha: '' });
   const [erro, setErro] = useState('');
@@ -23,7 +23,7 @@ export function PaginaEntrada() {
     setEnviando(true);
     try {
       await entrar(dados);
-      navegar('/painel');
+      navegar('/painel', { replace: true });
     } catch (erroApi) {
       setErro(erroApi.message);
     } finally {
@@ -54,9 +54,9 @@ export function PaginaEntrada() {
             Acompanhe tudo o que importa na sua vida acadêmica com a Lembraí.
           </p>
 
-          {erro && (
+          {(erro || erroSessao) && (
             <div className="alerta erro" role="alert">
-              {erro}
+              {erro || erroSessao}
             </div>
           )}
 
