@@ -4,6 +4,8 @@
 
 MVP da Lembraí, um assistente acadêmico integrado ao WhatsApp por meio da Evolution API, com frontend React/JavaScript, backend Node.js/JavaScript, chatbot Python/FastAPI, PostgreSQL hospedado no Supabase e Redis/BullMQ.
 
+Antes da primeira execução, configure os arquivos de ambiente para o Supabase Auth conforme [`docs/autenticacao-supabase.md`](docs/autenticacao-supabase.md). Os formulários usam sessões JWT do Supabase, com renovação automática e validação no backend.
+
 A execução rápida recomendada **não exige Docker**. Na pasta do projeto, execute:
 
 ```powershell

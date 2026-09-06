@@ -1,22 +1,9 @@
 const crypto = require('node:crypto');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 const ambiente = require('../configuracao/ambiente');
 
 async function gerarHashSenha(senha) {
   return bcrypt.hash(senha, 12);
-}
-
-async function compararSenha(senha, hash) {
-  return bcrypt.compare(senha, hash);
-}
-
-function emitirToken(usuario) {
-  return jwt.sign({ sub: usuario.id, email: usuario.email, nome: usuario.nome }, ambiente.jwtSegredo, { expiresIn: ambiente.jwtExpiracao });
-}
-
-function verificarToken(token) {
-  return jwt.verify(token, ambiente.jwtSegredo);
 }
 
 function obterChaveCriptografia() {
@@ -53,4 +40,4 @@ function removerSegredos(usuario) {
   return publico;
 }
 
-module.exports = { gerarHashSenha, compararSenha, emitirToken, verificarToken, criptografar, descriptografar, removerSegredos };
+module.exports = { gerarHashSenha, criptografar, descriptografar, removerSegredos };

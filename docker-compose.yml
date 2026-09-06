@@ -48,6 +48,9 @@ services:
       AMBIENTE: ${AMBIENTE:-desenvolvimento}
       PORTA_BACKEND: 3000
       URL_FRONTEND: ${URL_FRONTEND:-http://localhost:5173}
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
+      CORS_ORIGENS: ${CORS_ORIGENS:-http://localhost:5173}
       DATABASE_URL: postgresql://assistente:assistente@postgres:5432/assistente_academico?schema=public
       REDIS_URL: redis://redis:6379
       JWT_SEGREDO: ${JWT_SEGREDO:-desenvolvimento-troque-este-segredo}
@@ -99,6 +102,8 @@ services:
       context: ./frontend
     environment:
       VITE_URL_API: http://localhost:3000/api
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
     ports:
       - "5173:5173"
     depends_on:

@@ -1,16 +1,18 @@
-const { verificarToken } = require('../utilitarios/seguranca');
 const ambiente = require('../configuracao/ambiente');
 
-function autenticar(req, res, proximo) {
-  const cabecalho = req.headers.authorization || '';
-  const token = cabecalho.startsWith('Bearer ') ? cabecalho.slice(7) : null;
-  if (!token) return res.status(401).json({ erro: 'Autenticação necessária' });
-  try {
-    req.usuario = verificarToken(token);
-    return proximo();
-  } catch (erro) {
-    return res.status(401).json({ erro: 'Token inválido ou expirado' });
-  }
+function criarAutenticador(servicoAutenticacao) {
+  return async (req, res, proximo) => {
+    const token = /^Bearer\s+(\S+)$/i.exec(req.headers.authorization || '')?.[1];
+    if (!token) return res.status(401).json({ erro: 'Autenticação necessária' });
+    try {
+      const identidade = await servicoAutenticacao.verificarToken(token);
+      req.perfil = await servicoAutenticacao.obterPerfil(identidade);
+      req.usuario = { sub: identidade.id, email: identidade.email };
+      return proximo();
+    } catch (erro) {
+      return proximo(erro);
+    }
+  };
 }
 
 function validarSegredoWebhook(req, res, proximo) {
@@ -26,4 +28,4 @@ function tratarErros(erro, req, res, proximo) {
   return res.status(status).json({ erro: status >= 500 ? 'Erro interno do servidor' : erro.message, ...(erro.detalhes ? { detalhes: erro.detalhes } : {}) });
 }
 
-module.exports = { autenticar, validarSegredoWebhook, tratarErros };
+module.exports = { criarAutenticador, validarSegredoWebhook, tratarErros };
