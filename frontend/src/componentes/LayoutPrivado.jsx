@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAutenticacao } from '../contextos/ContextoAutenticacao';
 import { MarcaLembrai } from './MarcaLembrai';
@@ -13,6 +14,14 @@ const links = [
 
 export function LayoutPrivado() {
   const { usuario, sair } = useAutenticacao();
+  const [saindo, setSaindo] = useState(false);
+  const [erroSaida, setErroSaida] = useState('');
+  async function encerrarSessao() {
+    setSaindo(true);
+    setErroSaida('');
+    try { await sair(); } catch (erro) { setErroSaida(erro.message); }
+    finally { setSaindo(false); }
+  }
   return (
     <div className="aplicacao">
       <aside className="barra-lateral">
@@ -24,8 +33,9 @@ export function LayoutPrivado() {
         <div className="barra-lateral-rodape">
           <div className="avatar pequeno">{usuario?.nome?.slice(0, 1).toUpperCase() || 'E'}</div>
           <div className="usuario-resumo"><strong>{usuario?.nome || 'Estudante'}</strong><span>{usuario?.email || 'conta acadêmica'}</span></div>
-          <button className="botao-icone" onClick={sair} title="Sair" aria-label="Sair da conta">↪</button>
+          <button className="botao-icone" onClick={encerrarSessao} disabled={saindo} title="Sair" aria-label="Sair da conta">↪</button>
         </div>
+        {erroSaida && <p role="alert">{erroSaida}</p>}
       </aside>
       <main className="conteudo-principal"><Outlet /></main>
     </div>
