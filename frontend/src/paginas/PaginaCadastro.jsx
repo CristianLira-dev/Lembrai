@@ -17,6 +17,7 @@ export function PaginaCadastro() {
     senha: ''
   });
   const [erro, setErro] = useState('');
+  const [mensagem, setMensagem] = useState('');
   const [enviando, setEnviando] = useState(false);
 
   const alterar = (evento) => {
@@ -31,6 +32,7 @@ export function PaginaCadastro() {
   async function enviar(evento) {
     evento.preventDefault();
     setErro('');
+    setMensagem('');
 
     const telefone = dados.telefone.replace(/\D/g, '');
 
@@ -47,12 +49,17 @@ export function PaginaCadastro() {
     setEnviando(true);
 
     try {
-      await cadastrar({
+      const resultado = await cadastrar({
         ...dados,
         telefone
       });
 
-      navegar('/painel');
+      if (resultado.confirmarEmail) {
+        setMensagem('Verifique sua caixa de entrada e confirme seu e-mail para acessar a Lembraí. Se já possui uma conta, tente entrar.');
+        setDados((atual) => ({ ...atual, senha: '' }));
+      } else {
+        navegar('/painel', { replace: true });
+      }
     } catch (erroApi) {
       setErro(erroApi.message || 'Não foi possível criar sua conta.');
     } finally {
@@ -93,6 +100,8 @@ export function PaginaCadastro() {
               {erro}
             </div>
           )}
+
+          {mensagem && <div className="alerta" role="status">{mensagem}</div>}
 
           <form onSubmit={enviar}>
             <div className="campo">

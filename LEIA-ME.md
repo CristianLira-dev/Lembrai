@@ -16,6 +16,8 @@ O painel web permite criar conta, entrar, visualizar indicadores, criar, editar,
 
 ## Execução rápida sem Docker
 
+Antes de iniciar, configure o Supabase Auth usando os arquivos `.env.example` e `frontend/.env.example`, conforme o [guia de autenticação](docs/autenticacao-supabase.md). Login e cadastro exigem acesso ao Supabase mesmo quando os dados da aplicação estão em memória. O guia inclui confirmação de e-mail, URLs de retorno, variáveis de hospedagem e sessões JWT.
+
 O modo rápido usa o repositório em memória e o WhatsApp simulado. Ele é o caminho mais simples para abrir o painel e testar o produto sem instalar PostgreSQL, Redis ou Docker. Os dados são perdidos quando o backend é encerrado.
 
 No Windows, abra um PowerShell na pasta do projeto e execute:
