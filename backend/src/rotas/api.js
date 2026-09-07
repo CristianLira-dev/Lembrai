@@ -46,6 +46,14 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   rotas.post('/webhooks/evolution', validarSegredoWebhook, webhook.evolution);
   rotas.post('/webhooks/evolution/simular', webhook.simular);
   rotas.get('/saude', (req, res) => res.json({ status: 'ok', servico: 'backend', data: new Date().toISOString() }));
+  rotas.get('/saude/banco', async (req, res, next) => {
+    try {
+      await repositorio.verificarConexao();
+      return res.json({ status: 'ok', servico: 'postgresql', data: new Date().toISOString() });
+    } catch (erro) {
+      return next(erro);
+    }
+  });
   return rotas;
 }
 

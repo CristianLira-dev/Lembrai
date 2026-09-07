@@ -184,6 +184,7 @@ O Redis sustenta as filas BullMQ `processamento-mensagens`, `processamento-lembr
 | `DELETE` | `/api/calendarios/:provedor/desconectar` | JWT | desligar provedor |
 | `POST` | `/api/webhooks/evolution` | segredo | receber WhatsApp |
 | `GET` | `/api/saude` | pública | saúde do backend |
+| `GET` | `/api/saude/banco` | pública | conectividade do PostgreSQL |
 
 ## 12. Rotas do frontend
 

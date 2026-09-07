@@ -24,6 +24,8 @@ class RepositorioMemoria {
     this.registros = [];
   }
 
+  async verificarConexao() { return true; }
+
   async buscarUsuarioPorEmail(email) { return this.usuarios.find((item) => item.email === email) || null; }
   async buscarUsuarioPorId(id) { return this.usuarios.find((item) => item.id === id) || null; }
   async buscarUsuarioPorTelefone(telefone) { return this.usuarios.find((item) => item.telefone === telefone) || null; }
@@ -106,6 +108,11 @@ class RepositorioMemoria {
 }
 
 class RepositorioPrisma {
+  async verificarConexao() {
+    await clientePrisma.$queryRaw`SELECT 1`;
+    return true;
+  }
+
   async buscarUsuarioPorEmail(email) { return clientePrisma.usuario.findUnique({ where: { email } }); }
   async buscarUsuarioPorId(id) { return clientePrisma.usuario.findUnique({ where: { id } }); }
   async buscarUsuarioPorTelefone(telefone) { return clientePrisma.usuario.findUnique({ where: { telefone } }); }

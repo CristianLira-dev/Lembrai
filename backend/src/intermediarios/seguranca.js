@@ -23,9 +23,14 @@ function validarSegredoWebhook(req, res, proximo) {
 }
 
 function tratarErros(erro, req, res, proximo) {
-  req.log?.error({ erro: erro.message, pilha: erro.stack }, 'erro na API');
-  const status = erro.statusCode || 500;
-  return res.status(status).json({ erro: status >= 500 ? 'Erro interno do servidor' : erro.message, ...(erro.detalhes ? { detalhes: erro.detalhes } : {}) });
+  req.log?.error({ erro: erro.message, codigo: erro.code, nome: erro.name, pilha: erro.stack }, 'erro na API');
+  const codigosBancoIndisponivel = new Set(['P1000', 'P1001', 'P1002', 'P1013', 'P2024', 'P2037']);
+  const bancoIndisponivel = erro.name === 'PrismaClientInitializationError' || codigosBancoIndisponivel.has(erro.code);
+  const status = bancoIndisponivel ? 503 : (erro.statusCode || 500);
+  const mensagem = bancoIndisponivel
+    ? 'Banco de dados temporariamente indisponível'
+    : (status >= 500 ? 'Erro interno do servidor' : erro.message);
+  return res.status(status).json({ erro: mensagem, ...(erro.detalhes ? { detalhes: erro.detalhes } : {}) });
 }
 
 module.exports = { criarAutenticador, validarSegredoWebhook, tratarErros };
