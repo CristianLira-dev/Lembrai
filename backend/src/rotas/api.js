@@ -19,6 +19,8 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   rotas.use('/autenticacao', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
   rotas.post('/autenticacao/cadastro', autenticacao.cadastrar);
   rotas.post('/autenticacao/entrar', autenticacao.entrar);
+  rotas.post('/autenticacao/confirmar-email', autenticacao.confirmarEmail);
+  rotas.post('/autenticacao/reenviar-codigo', autenticacao.reenviarCodigo);
   rotas.get('/autenticacao/eu', autenticar, autenticacao.eu);
 
   rotas.get('/tarefas', autenticar, tarefas.listar);

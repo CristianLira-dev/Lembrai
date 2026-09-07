@@ -24,6 +24,15 @@ const esquemaEntrada = z.object({
   senha: z.string().min(1).max(128)
 });
 
+const esquemaConfirmarEmail = z.object({
+  email: z.string().trim().email().transform((valor) => valor.toLowerCase()),
+  codigo: z.string().trim().regex(/^\d{6}$/, 'Informe o código de 6 dígitos')
+});
+
+const esquemaReenviarCodigo = z.object({
+  email: z.string().trim().email().transform((valor) => valor.toLowerCase())
+});
+
 const tiposTarefa = ['tarefa', 'prova', 'trabalho', 'aula', 'compromisso', 'outro'];
 const prioridades = ['baixa', 'media', 'alta'];
 const statusTarefa = ['pendente', 'concluida', 'cancelada'];
@@ -91,6 +100,8 @@ module.exports = {
   esquemaTelefone,
   esquemaCadastro,
   esquemaEntrada,
+  esquemaConfirmarEmail,
+  esquemaReenviarCodigo,
   esquemaCriarTarefa,
   esquemaAtualizarTarefa,
   esquemaCriarLembrete,
