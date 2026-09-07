@@ -1,15 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
+import { resolverConfiguracaoSupabase } from './configuracao-supabase';
 
-const url = import.meta.env.VITE_SUPABASE_URL;
-const chave = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const { url, chave } = resolverConfiguracaoSupabase(import.meta.env);
 
 // Somente a chave publicável pode chegar ao navegador.
-export const supabase = url && chave ? createClient(url, chave, {
+export const supabase = createClient(url, chave, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-}) : null;
+});
 
 export function exigirSupabase() {
-  if (!supabase) throw new Error('Autenticação indisponível. Configure a conexão com o Supabase.');
   return supabase;
 }
 
