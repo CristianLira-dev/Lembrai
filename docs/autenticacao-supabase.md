@@ -8,6 +8,8 @@ Use Node.js 22 ou superior. Copie `.env.example` para `.env` na raiz e `frontend
 
 Preencha `DATABASE_URL` e `DIRECT_URL` com as conexões do projeto Supabase obtidas em **Connect**. Preserve os valores existentes se o backend já estiver conectado. A senha do banco fica somente no ambiente do backend. Não use `service_role`, `sb_secret_...` nem o segredo de assinatura JWT em variáveis `VITE_`.
 
+No Render, use em `DATABASE_URL` a string **Session pooler**, na porta `5432`. A conexão direta `db.<project-ref>.supabase.co` usa IPv6 por padrão e pode não funcionar em uma hospedagem somente IPv4. Copie o host exato exibido pelo Supabase e aplique URL encoding à senha quando ela contiver caracteres especiais. `DIRECT_URL` pode repetir a Session pooler quando o ambiente que executa as migrations também não tiver IPv6.
+
 ```sh
 npm --prefix backend ci
 npm --prefix backend run prisma:gerar
@@ -20,6 +22,15 @@ O modo `npm run dev` continua usando dados de aplicação em memória para desen
 Em **Authentication → URL Configuration**, configure o Site URL e permita `http://localhost:5173/entrar` em Redirect URLs para desenvolvimento. Em produção, permita a URL HTTPS real terminada em `/entrar`, configure `URL_FRONTEND` e `CORS_ORIGENS` no backend e `VITE_URL_API` no frontend. Mantenha a confirmação de e-mail conforme a configuração desejada do Auth; o formulário suporta tanto a confirmação por e-mail quanto a sessão imediata.
 
 Na hospedagem do frontend, configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e `VITE_URL_API` **antes do build**. Na hospedagem do backend, configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `DIRECT_URL`, `URL_FRONTEND` e `CORS_ORIGENS`. Recompile o frontend e reinicie o backend após alterar o ambiente.
+
+Depois do redeploy do backend, valide separadamente a aplicação e o banco:
+
+```text
+GET /api/saude        -> 200 (processo Express ativo)
+GET /api/saude/banco  -> 200 (PostgreSQL acessível pelo Prisma)
+```
+
+Uma resposta `503` em `/api/saude/banco` indica que `DATABASE_URL` está ausente, inválida ou inacessível. O detalhe técnico permanece somente nos logs do backend; a API não expõe credenciais.
 
 ## Identidade, dados e compatibilidade
 
