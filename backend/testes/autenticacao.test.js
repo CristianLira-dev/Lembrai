@@ -136,3 +136,18 @@ test('API protege rotas, rejeita JWT local e restringe tarefas ao usuário valid
   assert.ok(!JSON.stringify(corpo).includes(outra.id));
   assert.equal((await fetch(base + '/tarefas/' + outra.id, { headers })).status, 404);
 });
+
+test('API diferencia indisponibilidade do PostgreSQL de um erro interno genérico', async (t) => {
+  const c = cenario();
+  c.repositorio.verificarConexao = async () => {
+    throw Object.assign(new Error('connection refused'), { name: 'PrismaClientInitializationError', code: 'P1001' });
+  };
+  const { app } = criarAplicacao({ servicos: { repositorio: c.repositorio, servicoAutenticacao: c.servico } });
+  const servidor = app.listen(0, '127.0.0.1');
+  await new Promise((resolve) => servidor.once('listening', resolve));
+  t.after(() => new Promise((resolve) => servidor.close(resolve)));
+
+  const res = await fetch('http://127.0.0.1:' + servidor.address().port + '/api/saude/banco');
+  assert.equal(res.status, 503);
+  assert.deepEqual(await res.json(), { erro: 'Banco de dados temporariamente indisponível' });
+});
