@@ -21,6 +21,19 @@ O modo `npm run dev` continua usando dados de aplicação em memória para desen
 
 Em **Authentication → URL Configuration**, configure o Site URL e permita `http://localhost:5173/entrar` em Redirect URLs para desenvolvimento. Em produção, permita a URL HTTPS real terminada em `/entrar`, configure `URL_FRONTEND` e `CORS_ORIGENS` no backend e `VITE_URL_API` no frontend. Mantenha a confirmação de e-mail conforme a configuração desejada do Auth; o formulário suporta tanto a confirmação por e-mail quanto a sessão imediata.
 
+### Código de confirmação do cadastro
+
+Em **Authentication → Emails → Confirm signup**, substitua o link padrão por um código de seis dígitos usando `{{ .Token }}`. Exemplo:
+
+```html
+<h2>Confirme seu cadastro na Lembraí</h2>
+<p>Digite este código na tela de cadastro:</p>
+<p style="font-size: 28px; font-weight: 700; letter-spacing: 8px;">{{ .Token }}</p>
+<p>O código é de uso único e expira em breve.</p>
+```
+
+O frontend mantém apenas o e-mail pendente em `sessionStorage`, aceita exclusivamente seis dígitos e troca o OTP por uma sessão Supabase com `verifyOtp`. O código não é armazenado pela aplicação. Configure a expiração em **Authentication → Sign In / Providers → Email → Email OTP Expiration** e preserve os limites de reenvio. Projetos que não permitem editar templates com o provedor de e-mail padrão precisam configurar **Custom SMTP** antes desta etapa.
+
 Na hospedagem do frontend, configure `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` e `VITE_URL_API` **antes do build**. Na hospedagem do backend, configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `DATABASE_URL`, `DIRECT_URL`, `URL_FRONTEND` e `CORS_ORIGENS`. Recompile o frontend e reinicie o backend após alterar o ambiente.
 
 Depois do redeploy do backend, valide separadamente a aplicação e o banco:

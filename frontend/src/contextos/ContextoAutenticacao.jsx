@@ -93,6 +93,19 @@ export function ProvedorAutenticacao({ children }) {
     return { confirmarEmail: resposta.data.confirmarEmail };
   }
 
+  async function confirmarEmail(email, codigo) {
+    exigirSupabase();
+    setErroSessao('');
+    const resposta = await api.confirmarEmail({ email, codigo });
+    await aceitarSessao(resposta.data.sessao);
+  }
+
+  async function reenviarCodigo(email) {
+    exigirSupabase();
+    setErroSessao('');
+    await api.reenviarCodigo({ email });
+  }
+
   async function sair() {
     const { error } = await exigirSupabase().auth.signOut({ scope: 'local' });
     if (error) throw new Error('Não foi possível encerrar a sessão. Tente novamente.');
@@ -101,7 +114,7 @@ export function ProvedorAutenticacao({ children }) {
   }
 
   const valor = useMemo(() => ({
-    usuario, carregando, erroSessao, autenticado: Boolean(usuario), entrar, cadastrar, sair
+    usuario, carregando, erroSessao, autenticado: Boolean(usuario), entrar, cadastrar, confirmarEmail, reenviarCodigo, sair
   }), [usuario, carregando, erroSessao]);
   return <ContextoAutenticacao.Provider value={valor}>{children}</ContextoAutenticacao.Provider>;
 }

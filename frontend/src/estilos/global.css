@@ -751,6 +751,21 @@ h3 {
     padding: 13px;
 }
 
+.campo-codigo input {
+    font-size: 1.5rem;
+    font-weight: 700;
+    letter-spacing: .45rem;
+    text-align: center;
+}
+
+.botao-link {
+    border: 0;
+    background: transparent;
+    color: var(--app-muted);
+    cursor: pointer;
+    text-decoration: underline;
+}
+
 .link-autenticacao {
     text-align: center;
     font-size: 12px;

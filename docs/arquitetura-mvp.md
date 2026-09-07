@@ -169,6 +169,8 @@ O Redis sustenta as filas BullMQ `processamento-mensagens`, `processamento-lembr
 |---|---|---|---|
 | `POST` | `/api/autenticacao/cadastro` | pública | criar conta |
 | `POST` | `/api/autenticacao/entrar` | pública | emitir JWT |
+| `POST` | `/api/autenticacao/confirmar-email` | pública | validar OTP de cadastro |
+| `POST` | `/api/autenticacao/reenviar-codigo` | pública | reenviar OTP de cadastro |
 | `GET` | `/api/autenticacao/eu` | JWT | usuário atual |
 | `GET/POST` | `/api/tarefas` | JWT | listar e criar tarefas |
 | `GET/PATCH/DELETE` | `/api/tarefas/:id` | JWT | consultar, editar e excluir |

@@ -25,7 +25,10 @@ function traduzirErro(erro) {
     user_already_exists: 'Não foi possível cadastrar esta conta. Tente entrar.',
     email_exists: 'Não foi possível cadastrar esta conta. Tente entrar.',
     weak_password: 'Escolha uma senha mais forte, com pelo menos 8 caracteres.',
-    signup_disabled: 'O cadastro está temporariamente indisponível.'
+    signup_disabled: 'O cadastro está temporariamente indisponível.',
+    otp_expired: 'Código inválido ou expirado. Solicite um novo código.',
+    otp_disabled: 'A confirmação por código está temporariamente indisponível.',
+    over_email_send_rate_limit: 'Aguarde um pouco antes de solicitar outro código.'
   };
   if (erro.status === 429) return falha('Muitas tentativas. Aguarde um pouco e tente novamente.', 429);
   if (!erro.status || erro.status >= 500) return falha('Não foi possível conectar à autenticação. Tente novamente.', 503);
@@ -97,6 +100,20 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth) 
       const { data, error } = await criarCliente().auth.signInWithPassword({ email: dados.email, password: dados.senha });
       if (error) throw traduzirErro(error);
       return { sessao: data.session };
+    },
+    async confirmarEmail({ email, codigo }) {
+      const { data, error } = await criarCliente().auth.verifyOtp({ email, token: codigo, type: 'email' });
+      if (error) throw traduzirErro(error);
+      if (!data.session) throw falha('Não foi possível iniciar sua sessão. Solicite um novo código.', 400);
+      return { sessao: data.session };
+    },
+    async reenviarCodigo({ email }) {
+      const { error } = await criarCliente().auth.resend({
+        type: 'signup', email,
+        options: { emailRedirectTo: `${ambiente.urlFrontend.replace(/\/$/, '')}/cadastro` }
+      });
+      if (error) throw traduzirErro(error);
+      return { enviado: true };
     }
   };
 }
