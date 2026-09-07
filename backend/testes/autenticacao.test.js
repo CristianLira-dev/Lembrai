@@ -24,7 +24,10 @@ function cenario(auth = {}) {
       chamadas.push(token);
       return token === 'valido' ? { data: { user: identidade }, error: null }
         : { data: { user: null }, error: { status: 401 } };
-    }, ...auth
+    },
+    async verifyOtp(d) { chamadas.push(d); return { data: { session: { access_token: 'jwt-otp', refresh_token: 'refresh-otp' } }, error: null }; },
+    async resend(d) { chamadas.push(d); return { data: {}, error: null }; },
+    ...auth
   } };
   const servico = criarServicoAutenticacao(repositorio, () => cliente);
   return { repositorio, servico, controlador: criarControladorAutenticacao(servico), chamadas };
@@ -63,6 +66,31 @@ test('cadastro pode devolver sessão imediata quando o Auth não exige confirma�
   const sessao = { access_token: 'jwt', refresh_token: 'refresh' };
   const c = cenario({ signUp: async () => ({ data: { session: sessao }, error: null }) });
   assert.deepEqual(await c.servico.cadastrar(dados), { sessao, confirmarEmail: false });
+});
+
+test('confirma cadastro com o OTP de seis dígitos e devolve a sessão', async () => {
+  const c = cenario();
+  const resultado = await c.servico.confirmarEmail({ email: dados.email, codigo: '123456' });
+  assert.equal(resultado.sessao.access_token, 'jwt-otp');
+  assert.deepEqual(c.chamadas[0], { email: dados.email, token: '123456', type: 'email' });
+});
+
+test('reenvia o código de confirmação sem criar outra conta', async () => {
+  const c = cenario();
+  assert.deepEqual(await c.servico.reenviarCodigo({ email: dados.email }), { enviado: true });
+  assert.deepEqual(c.chamadas[0], {
+    type: 'signup', email: dados.email,
+    options: { emailRedirectTo: 'http://localhost:5173/cadastro' }
+  });
+});
+
+test('API rejeita código de confirmação fora do formato de seis dígitos', async () => {
+  const c = cenario();
+  await assert.rejects(
+    () => c.controlador.confirmarEmail({ body: { email: dados.email, codigo: 'A1234' } }, resposta()),
+    { statusCode: 400 }
+  );
+  assert.equal(c.chamadas.length, 0);
 });
 
 test('traduz credenciais inválidas, e-mail não confirmado, limite e indisponibilidade', async () => {
