@@ -14,13 +14,12 @@ Na raiz, execute:
 npm run dev
 ```
 
-Esse modo instala dependências ausentes, inicia chatbot, backend e frontend e mantém os dados da aplicação em memória. O Auth continua usando o Supabase. Acesse:
+Esse modo instala dependências ausentes, inicia backend e frontend ao mesmo tempo e mantém os dados da aplicação em memória. O Auth continua usando o Supabase. Acesse:
 
 | Serviço | Endereço |
 |---|---|
 | Painel React | [http://localhost:5173](http://localhost:5173) |
 | Saúde da API | [http://localhost:3000/api/saude](http://localhost:3000/api/saude) |
-| Chatbot | [http://localhost:8000/docs](http://localhost:8000/docs) |
 
 ## Persistência no Supabase
 
