@@ -12,12 +12,9 @@
     "start": "node scripts/servidor-sem-redis.js",
     "worker": "node src/worker.js",
     "teste": "node --test",
-    "test": "node --test",
-    "prisma:gerar": "prisma generate",
-    "prisma:migrar": "prisma migrate deploy"
+    "test": "node --test"
   },
   "dependencies": {
-    "@prisma/client": "^6.7.0",
     "@supabase/supabase-js": "2.115.0",
     "axios": "^1.8.4",
     "bcryptjs": "^3.0.2",
@@ -32,8 +29,5 @@
     "pino": "^9.6.0",
     "pino-http": "^10.4.0",
     "zod": "^3.24.2"
-  },
-  "devDependencies": {
-    "prisma": "^6.7.0"
   }
 }

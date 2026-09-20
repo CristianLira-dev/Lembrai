@@ -68,11 +68,11 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth) 
     try {
       return removerSegredos(await repositorio.criarUsuario({
         ...perfil, id: usuarioAuth.id,
-        // Campo legado obrigatório no Prisma. Não é senha nem hash utilizável.
+        // Campo legado obrigatório no schema. Não é senha nem hash utilizável.
         senhaCriptografada: '!supabase-auth'
       }));
     } catch (erro) {
-      if (erro.code === 'P2002') {
+      if (erro.code === '23505') {
         const concorrente = await repositorio.buscarUsuarioPorId(usuarioAuth.id);
         if (concorrente) return removerSegredos(concorrente);
         throw falha('E-mail ou WhatsApp já cadastrado.', 409);

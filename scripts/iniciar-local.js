@@ -30,7 +30,6 @@ function preparar() {
   if (!fs.existsSync(path.join(backend, 'node_modules'))) {
     console.log('Instalando dependências do backend...');
     executar(npm, ['install'], { cwd: backend });
-    executar(npm, ['run', 'prisma:gerar'], { cwd: backend });
   }
   if (!fs.existsSync(path.join(frontend, 'node_modules'))) {
     console.log('Instalando dependências do frontend...');

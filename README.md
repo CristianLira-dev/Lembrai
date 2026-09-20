@@ -6,7 +6,7 @@ MVP da Lembraí, um assistente acadêmico integrado ao WhatsApp por meio da Evol
 
 Antes da primeira execução, configure os arquivos de ambiente para o Supabase Auth conforme [`docs/autenticacao-supabase.md`](docs/autenticacao-supabase.md). Os formulários usam sessões JWT do Supabase, com renovação automática e validação no backend.
 
-A execução rápida recomendada **não exige Docker**. Na pasta do projeto, execute:
+A execução rápida recomendada inicia os serviços diretamente no sistema. Na pasta do projeto, execute:
 
 ```powershell
 npm run dev

@@ -41,18 +41,17 @@ O frontend nunca acessa PostgreSQL/Supabase, Redis, Evolution API, tokens OAuth 
 
 | Serviço | Tecnologia | Responsabilidade | Porta local |
 |---|---|---|---:|
-| `frontend` | React, Vite, JavaScript, React Router, Axios | Painel, autenticação e consumo da API | 5173 |
-| `backend` | Node.js, Express, Prisma, Zod, Pino, BullMQ | API REST, autenticação, negócio, webhooks e integrações | 3000 |
+| `frontend` | React, Vite, JavaScript, React Router, Fetch API | Painel, autenticação e consumo da API | 5173 |
+| `backend` | Node.js, Express, Supabase JS, Zod, Pino, BullMQ | API REST, autenticação, negócio, webhooks e integrações | 3000 |
 | `chatbot` | Python, FastAPI, Pydantic | Interpretação de mensagens e geração de resposta estruturada | 8000 |
-| `postgres` | PostgreSQL/Supabase | Persistência relacional multiusuário | 5432 |
+| Supabase | Auth, PostgreSQL e Data API | Identidade e persistência relacional multiusuário | externo |
 | `redis` | Redis 7 | Filas, idempotência e armazenamento transitório | 6379 |
 | Evolution API | Serviço externo ou container separado | WhatsApp, envio e webhooks | externo |
 
-Duas formas de execução são suportadas. A primeira, recomendada para desenvolvimento no Windows, é a execução local dos aplicativos sem Docker, usando o modo memória para uma experiência rápida ou PostgreSQL hospedado no Supabase e Redis para persistência e processamento assíncrono. A segunda é o **Docker Compose**, mantido como alternativa para reproduzir o ambiente completo localmente com PostgreSQL, Redis e serviços isolados.
+Os aplicativos são executados diretamente no sistema. O modo memória oferece uma experiência rápida, enquanto Supabase e Redis fornecem persistência e processamento assíncrono no modo completo.
 
 | Abordagem | Trade-offs | Custo | Complexidade de configuração |
 |---|---|---|---|
-| Docker Compose | Ambientes mais reproduzíveis e serviços isolados; requer Docker instalado | Sem custo de licença; depende da infraestrutura escolhida | Baixa após instalar Docker |
 | Execução local dos aplicativos | Depuração simples e inicialização rápida; versões e serviços precisam ser mantidos manualmente | Sem custo adicional | Média |
 
 Para produção, o webhook precisa de HTTPS e URL pública. A Evolution API documenta webhooks globais e por instância, eventos como `MESSAGES_UPSERT` e `CONNECTION_UPDATE`, cabeçalhos personalizados, reenvio com backoff e recomenda resposta rápida com processamento assíncrono [1] [2].
@@ -72,8 +71,7 @@ ChatBot-Tasks/
 │   │   ├── rotas/
 │   │   └── estilos/
 │   ├── publico/
-│   ├── package.json
-│   └── Dockerfile
+│   └── package.json
 ├── backend/
 │   ├── src/
 │   │   ├── configuracao/
@@ -88,9 +86,7 @@ ChatBot-Tasks/
 │   │   ├── validadores/
 │   │   ├── utilitarios/
 │   │   └── servidor.js
-│   ├── prisma/schema.prisma
-│   ├── package.json
-│   └── Dockerfile
+│   └── package.json
 ├── chatbot/
 │   ├── aplicativo/
 │   │   ├── api/
@@ -103,10 +99,9 @@ ChatBot-Tasks/
 │   │   ├── configuracao/
 │   │   └── principal.py
 │   ├── testes/
-│   ├── requisitos.txt
-│   └── Dockerfile
+│   └── requisitos.txt
+├── supabase/schema.sql
 ├── docs/arquitetura-mvp.md
-├── docker-compose.yml
 ├── package.json
 ├── scripts/iniciar-local.js
 ├── scripts/iniciar-local.ps1
@@ -117,7 +112,7 @@ ChatBot-Tasks/
 
 ## 5. Modelo de dados
 
-O Prisma modela `Usuario`, `Tarefa`, `ConexaoCalendario`, `EventoCalendario`, `Lembrete`, `Conversa`, `Mensagem`, `EventoWebhook` e `RegistroSincronizacao`. Índices e restrições únicas protegem o isolamento por usuário e a idempotência de mensagens e webhooks.
+O schema SQL modela `Usuario`, `Tarefa`, `ConexaoCalendario`, `EventoCalendario`, `Lembrete`, `Conversa`, `Mensagem`, `EventoWebhook` e `RegistroSincronizacao`. Índices e restrições únicas protegem o isolamento por usuário e a idempotência de mensagens e webhooks.
 
 | Entidade | Finalidade | Relações principais |
 |---|---|---|
@@ -135,9 +130,9 @@ A estratégia de conflito utiliza `externalEventId`, `updatedAt`, `lastSyncedAt`
 
 ## 6. Autenticação e multi-tenancy
 
-O cadastro cria um usuário com senha submetida por HTTPS. O backend aplica `bcryptjs`, emite JWT com expiração configurável e protege todas as rotas de negócio com o middleware de autenticação. As consultas sempre filtram por `usuarioId`; o telefone do WhatsApp é usado somente para localizar ou criar o usuário associado à conversa.
+O cadastro envia a senha por HTTPS ao Supabase Auth. O Supabase emite e renova o JWT; o backend valida o Bearer token com `auth.getUser` e protege as rotas de negócio. As consultas sempre filtram por `usuarioId`; o telefone do WhatsApp é usado somente para localizar ou criar o usuário associado à conversa.
 
-O frontend mantém o token em `localStorage` apenas para o MVP de desenvolvimento, remove-o no logout e não recebe tokens OAuth de calendários. Em produção, a evolução recomendada é cookie `HttpOnly`, `Secure` e `SameSite=Lax`, com rotação e revogação de sessão.
+O SDK do Supabase mantém a sessão no navegador, renova o access token e remove a sessão local no logout. O frontend não recebe tokens OAuth de calendários nem a chave secreta da Data API.
 
 ## 7. Evolution API e webhooks
 
@@ -194,11 +189,11 @@ As telas são `/`, `/entrar`, `/cadastro`, `/painel`, `/tarefas`, `/tarefas/nova
 
 ## 13. Segurança
 
-O backend usa Helmet, CORS configurável, limite de requisições, Zod, logs estruturados, timeout no chatbot, segredo de serviço, segredo de webhook, hash de senha e criptografia opcional de tokens. Segredos entram somente por ambiente. Em produção, o serviço deve operar atrás de HTTPS, com banco e Redis privados e rotação de chaves.
+O backend usa Helmet, CORS configurável, limite de requisições, Zod, logs estruturados, timeout no chatbot, segredo de serviço, segredo de webhook e criptografia opcional de tokens. Segredos entram somente por ambiente. A chave secreta do Supabase fica restrita ao backend. Em produção, os serviços devem operar atrás de HTTPS, com Redis privado e rotação de chaves.
 
 ## 14. Plano de implementação
 
-1. **Fundação:** documentação, variáveis, Docker Compose e schema Prisma.
+1. **Fundação:** documentação, variáveis e schema SQL do Supabase.
 2. **Backend:** autenticação, CRUD, webhook, filas, chatbot client e adaptadores.
 3. **Chatbot:** contratos Pydantic, parser de intenções, datas relativas e testes.
 4. **Frontend:** shell responsivo, autenticação, dashboard, tarefas, calendário e integrações.

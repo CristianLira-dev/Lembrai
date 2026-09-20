@@ -24,8 +24,7 @@ function validarSegredoWebhook(req, res, proximo) {
 
 function tratarErros(erro, req, res, proximo) {
   req.log?.error({ erro: erro.message, codigo: erro.code, nome: erro.name, pilha: erro.stack }, 'erro na API');
-  const codigosBancoIndisponivel = new Set(['P1000', 'P1001', 'P1002', 'P1013', 'P2024', 'P2037']);
-  const bancoIndisponivel = erro.name === 'PrismaClientInitializationError' || codigosBancoIndisponivel.has(erro.code);
+  const bancoIndisponivel = new Set(['SUPABASE_CONFIG', 'SUPABASE_DATA_API']).has(erro.code);
   const status = bancoIndisponivel ? 503 : (erro.statusCode || 500);
   const mensagem = bancoIndisponivel
     ? 'Banco de dados temporariamente indisponível'

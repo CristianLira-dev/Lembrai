@@ -13,7 +13,7 @@ if [[ ! -x "$RAIZ/chatbot/.venv/bin/python" ]]; then
 fi
 
 if [[ ! -d "$RAIZ/backend/node_modules" ]]; then
-  (cd "$RAIZ/backend" && npm install && npm run prisma:gerar)
+  (cd "$RAIZ/backend" && npm install)
 fi
 
 if [[ ! -d "$RAIZ/frontend/node_modules" ]]; then

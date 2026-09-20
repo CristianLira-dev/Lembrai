@@ -1,14 +1,17 @@
-const { PrismaClient } = require('@prisma/client');
-
-const clientePrisma = new PrismaClient();
+const { createClient } = require('@supabase/supabase-js');
+const ambiente = require('../configuracao/ambiente');
 
 function criarId(prefixo) {
   return `${prefixo}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function dataIso(valor = new Date()) {
+  return new Date(valor).toISOString();
+}
+
 function normalizarTarefa(tarefa) {
   if (!tarefa) return tarefa;
-  return { ...tarefa, dataEntrega: new Date(tarefa.dataEntrega).toISOString() };
+  return { ...tarefa, dataEntrega: dataIso(tarefa.dataEntrega) };
 }
 
 class RepositorioMemoria {
@@ -107,67 +110,167 @@ class RepositorioMemoria {
   }
 }
 
-class RepositorioPrisma {
-  async verificarConexao() {
-    await clientePrisma.$queryRaw`SELECT 1`;
-    return true;
+function falhaDados(erro) {
+  if (erro?.code === '23505') return erro;
+  const falha = new Error('Supabase Data API indisponível');
+  falha.code = 'SUPABASE_DATA_API';
+  falha.statusCode = 503;
+  falha.cause = erro;
+  return falha;
+}
+
+function criarClienteDados() {
+  if (!ambiente.supabaseUrl || !ambiente.supabaseChaveSecreta) {
+    const erro = new Error('Configure SUPABASE_URL e SUPABASE_SECRET_KEY no backend');
+    erro.code = 'SUPABASE_CONFIG';
+    erro.statusCode = 503;
+    throw erro;
+  }
+  return createClient(ambiente.supabaseUrl, ambiente.supabaseChaveSecreta, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: (url, opcoes) => fetch(url, { ...opcoes, signal: AbortSignal.timeout(10000) }) }
+  });
+}
+
+class RepositorioSupabase {
+  constructor(criarCliente = criarClienteDados) {
+    this.criarCliente = criarCliente;
   }
 
-  async buscarUsuarioPorEmail(email) { return clientePrisma.usuario.findUnique({ where: { email } }); }
-  async buscarUsuarioPorId(id) { return clientePrisma.usuario.findUnique({ where: { id } }); }
-  async buscarUsuarioPorTelefone(telefone) { return clientePrisma.usuario.findUnique({ where: { telefone } }); }
-  async criarUsuario(dados) { return clientePrisma.usuario.create({ data: dados }); }
-
-  async listarTarefas(usuarioId, filtros = {}) {
-    const where = { usuarioId };
-    if (filtros.status) where.status = filtros.status;
-    if (filtros.periodo === 'hoje') { const inicio = new Date(); inicio.setHours(0, 0, 0, 0); const fim = new Date(inicio); fim.setDate(fim.getDate() + 1); where.dataEntrega = { gte: inicio, lt: fim }; }
-    return clientePrisma.tarefa.findMany({ where, orderBy: { dataEntrega: 'asc' } });
-  }
-  async buscarTarefa(usuarioId, id) { return clientePrisma.tarefa.findFirst({ where: { id, usuarioId } }); }
-  async criarTarefa(dados) { return clientePrisma.tarefa.create({ data: { ...dados, dataEntrega: new Date(dados.dataEntrega) } }); }
-  async atualizarTarefa(usuarioId, id, dados) { const existente = await this.buscarTarefa(usuarioId, id); if (!existente) return null; return clientePrisma.tarefa.update({ where: { id }, data: { ...dados, ...(dados.dataEntrega ? { dataEntrega: new Date(dados.dataEntrega) } : {}) } }); }
-  async excluirTarefa(usuarioId, id) { const existente = await this.buscarTarefa(usuarioId, id); if (!existente) return false; await clientePrisma.tarefa.delete({ where: { id } }); return true; }
-
-  async listarLembretes(usuarioId) { return clientePrisma.lembrete.findMany({ where: { usuarioId }, orderBy: { agendadoPara: 'asc' }, include: { tarefa: true } }); }
-  async listarLembretesPendentes(ate = new Date()) { return clientePrisma.lembrete.findMany({ where: { status: 'agendado', agendadoPara: { lte: ate } }, orderBy: { agendadoPara: 'asc' }, take: 50, include: { tarefa: true } }); }
-  async criarLembrete(dados) { return clientePrisma.lembrete.create({ data: { ...dados, agendadoPara: new Date(dados.agendadoPara) } }); }
-  async buscarLembrete(usuarioId, id) { return clientePrisma.lembrete.findFirst({ where: { id, usuarioId }, include: { tarefa: true } }); }
-  async buscarLembretePorId(id) { return clientePrisma.lembrete.findUnique({ where: { id }, include: { tarefa: true } }); }
-  async atualizarLembrete(usuarioId, id, dados) { const existente = await this.buscarLembrete(usuarioId, id); if (!existente) return null; return clientePrisma.lembrete.update({ where: { id }, data: { ...dados, ...(dados.agendadoPara ? { agendadoPara: new Date(dados.agendadoPara) } : {}) } }); }
-  async excluirLembrete(usuarioId, id) { const existente = await this.buscarLembrete(usuarioId, id); if (!existente) return false; await clientePrisma.lembrete.delete({ where: { id } }); return true; }
-
-  async buscarOuCriarConversa(usuarioId, telefone) { return clientePrisma.conversa.upsert({ where: { usuarioId_telefone: { usuarioId, telefone } }, update: {}, create: { usuarioId, telefone } }); }
-  async atualizarConversa(id, dados) { return clientePrisma.conversa.update({ where: { id }, data: dados }); }
-  async salvarMensagem(dados) { return clientePrisma.mensagem.create({ data: dados }); }
-  async listarConversas(usuarioId) { return clientePrisma.conversa.findMany({ where: { usuarioId }, orderBy: { atualizadoEm: 'desc' }, include: { mensagens: { take: 1, orderBy: { criadoEm: 'desc' } } } }); }
-  async listarMensagens(usuarioId, conversaId) { const conversa = await clientePrisma.conversa.findFirst({ where: { id: conversaId, usuarioId } }); if (!conversa) return null; return clientePrisma.mensagem.findMany({ where: { conversaId }, orderBy: { criadoEm: 'asc' } }); }
-  async registrarEventoWebhook(dados) {
+  async executar(consulta) {
     try {
-      const evento = await clientePrisma.eventoWebhook.create({ data: dados });
-      return { duplicado: false, evento };
+      const resultado = await consulta;
+      if (resultado.error) throw resultado.error;
+      return resultado;
     } catch (erro) {
-      if (erro.code === 'P2002') {
-        const evento = await clientePrisma.eventoWebhook.findFirst({ where: { provedor: dados.provedor, identificadorEventoExterno: dados.identificadorEventoExterno } });
-        return { duplicado: true, evento };
-      }
-      throw erro;
+      throw falhaDados(erro);
     }
   }
 
-  async listarConexoes(usuarioId) { return clientePrisma.conexaoCalendario.findMany({ where: { usuarioId }, orderBy: { provedor: 'asc' } }); }
-  async buscarConexao(usuarioId, provedor) { return clientePrisma.conexaoCalendario.findUnique({ where: { usuarioId_provedor: { usuarioId, provedor } } }); }
-  async salvarConexao(dados) {
-    const { id, criadoEm, atualizadoEm, ...campos } = dados;
-    return clientePrisma.conexaoCalendario.upsert({ where: { usuarioId_provedor: { usuarioId: campos.usuarioId, provedor: campos.provedor } }, update: campos, create: campos });
+  async verificarConexao() {
+    await this.executar(this.criarCliente().from('Usuario').select('id').limit(1));
+    return true;
   }
-  async excluirConexao(usuarioId, provedor) { const existente = await this.buscarConexao(usuarioId, provedor); if (!existente) return false; await clientePrisma.conexaoCalendario.delete({ where: { id: existente.id } }); return true; }
-  async criarEventoCalendario(dados) { return clientePrisma.eventoCalendario.create({ data: { ...dados, dataInicio: new Date(dados.dataInicio), dataFim: new Date(dados.dataFim) } }); }
-  async criarRegistroSincronizacao(dados) { return clientePrisma.registroSincronizacao.create({ data: dados }); }
-  async estatisticas(usuarioId) { const [total, pendentes, concluidas, atrasadas, provas] = await Promise.all([clientePrisma.tarefa.count({ where: { usuarioId } }), clientePrisma.tarefa.count({ where: { usuarioId, status: 'pendente' } }), clientePrisma.tarefa.count({ where: { usuarioId, status: 'concluida' } }), clientePrisma.tarefa.count({ where: { usuarioId, status: 'pendente', dataEntrega: { lt: new Date() } } }), clientePrisma.tarefa.findMany({ where: { usuarioId, tipo: 'prova', status: 'pendente' }, orderBy: { dataEntrega: 'asc' }, take: 5 })]); return { total, pendentes, concluidas, atrasadas, provas }; }
+
+  async buscarUm(tabela, filtros) {
+    let consulta = this.criarCliente().from(tabela).select('*');
+    Object.entries(filtros).forEach(([campo, valor]) => { consulta = consulta.eq(campo, valor); });
+    return (await this.executar(consulta.maybeSingle())).data;
+  }
+
+  async inserir(tabela, dados) {
+    return (await this.executar(this.criarCliente().from(tabela).insert(dados).select().single())).data;
+  }
+
+  async buscarUsuarioPorEmail(email) { return this.buscarUm('Usuario', { email }); }
+  async buscarUsuarioPorId(id) { return this.buscarUm('Usuario', { id }); }
+  async buscarUsuarioPorTelefone(telefone) { return this.buscarUm('Usuario', { telefone }); }
+  async criarUsuario(dados) {
+    const agora = dataIso();
+    return this.inserir('Usuario', { id: criarId('usr'), fusoHorario: 'America/Sao_Paulo', criadoEm: agora, atualizadoEm: agora, ...dados });
+  }
+
+  async listarTarefas(usuarioId, filtros = {}) {
+    let consulta = this.criarCliente().from('Tarefa').select('*').eq('usuarioId', usuarioId);
+    if (filtros.status) consulta = consulta.eq('status', filtros.status);
+    if (filtros.periodo === 'hoje') {
+      const inicio = new Date();
+      inicio.setHours(0, 0, 0, 0);
+      const fim = new Date(inicio);
+      fim.setDate(fim.getDate() + 1);
+      consulta = consulta.gte('dataEntrega', dataIso(inicio)).lt('dataEntrega', dataIso(fim));
+    }
+    const { data } = await this.executar(consulta.order('dataEntrega', { ascending: true }));
+    return data.map(normalizarTarefa);
+  }
+  async buscarTarefa(usuarioId, id) { return this.buscarUm('Tarefa', { id, usuarioId }); }
+  async criarTarefa(dados) {
+    const agora = dataIso();
+    const tarefa = await this.inserir('Tarefa', { id: criarId('tar'), status: 'pendente', prioridade: 'media', tipo: 'tarefa', criadoEm: agora, atualizadoEm: agora, ...dados, dataEntrega: dataIso(dados.dataEntrega) });
+    return normalizarTarefa(tarefa);
+  }
+  async atualizarTarefa(usuarioId, id, dados) {
+    const campos = { ...dados, atualizadoEm: dataIso(), ...(dados.dataEntrega ? { dataEntrega: dataIso(dados.dataEntrega) } : {}) };
+    const { data } = await this.executar(this.criarCliente().from('Tarefa').update(campos).eq('id', id).eq('usuarioId', usuarioId).select().maybeSingle());
+    return normalizarTarefa(data);
+  }
+  async excluirTarefa(usuarioId, id) {
+    const { data } = await this.executar(this.criarCliente().from('Tarefa').delete().eq('id', id).eq('usuarioId', usuarioId).select('id').maybeSingle());
+    return Boolean(data);
+  }
+
+  consultaLembrete() { return '*, tarefa:Tarefa(*)'; }
+  async listarLembretes(usuarioId) { const { data } = await this.executar(this.criarCliente().from('Lembrete').select(this.consultaLembrete()).eq('usuarioId', usuarioId).order('agendadoPara', { ascending: true })); return data; }
+  async listarLembretesPendentes(ate = new Date()) { const { data } = await this.executar(this.criarCliente().from('Lembrete').select(this.consultaLembrete()).eq('status', 'agendado').lte('agendadoPara', dataIso(ate)).order('agendadoPara', { ascending: true }).limit(50)); return data; }
+  async criarLembrete(dados) { return this.inserir('Lembrete', { id: criarId('lem'), status: 'agendado', tentativas: 0, criadoEm: dataIso(), ...dados, agendadoPara: dataIso(dados.agendadoPara) }); }
+  async buscarLembrete(usuarioId, id) { const { data } = await this.executar(this.criarCliente().from('Lembrete').select(this.consultaLembrete()).eq('id', id).eq('usuarioId', usuarioId).maybeSingle()); return data; }
+  async buscarLembretePorId(id) { const { data } = await this.executar(this.criarCliente().from('Lembrete').select(this.consultaLembrete()).eq('id', id).maybeSingle()); return data; }
+  async atualizarLembrete(usuarioId, id, dados) { const campos = { ...dados, ...(dados.agendadoPara ? { agendadoPara: dataIso(dados.agendadoPara) } : {}) }; const { data } = await this.executar(this.criarCliente().from('Lembrete').update(campos).eq('id', id).eq('usuarioId', usuarioId).select(this.consultaLembrete()).maybeSingle()); return data; }
+  async excluirLembrete(usuarioId, id) { const { data } = await this.executar(this.criarCliente().from('Lembrete').delete().eq('id', id).eq('usuarioId', usuarioId).select('id').maybeSingle()); return Boolean(data); }
+
+  async buscarOuCriarConversa(usuarioId, telefone) {
+    const existente = await this.buscarUm('Conversa', { usuarioId, telefone });
+    if (existente) return existente;
+    const agora = dataIso();
+    try {
+      return await this.inserir('Conversa', { id: criarId('conv'), usuarioId, telefone, criadoEm: agora, atualizadoEm: agora });
+    } catch (erro) {
+      if (erro.code === '23505') return this.buscarUm('Conversa', { usuarioId, telefone });
+      throw erro;
+    }
+  }
+  async atualizarConversa(id, dados) { const { data } = await this.executar(this.criarCliente().from('Conversa').update({ ...dados, atualizadoEm: dataIso() }).eq('id', id).select().maybeSingle()); return data; }
+  async salvarMensagem(dados) { const agora = dataIso(); return this.inserir('Mensagem', { id: criarId('msg'), statusProcessamento: 'processado', criadoEm: agora, atualizadoEm: agora, ...dados, ...(dados.criadoEm ? { criadoEm: dataIso(dados.criadoEm) } : {}) }); }
+  async listarConversas(usuarioId) {
+    const { data } = await this.executar(this.criarCliente().from('Conversa').select('*, mensagens:Mensagem(*)').eq('usuarioId', usuarioId).order('atualizadoEm', { ascending: false }));
+    return data.map((conversa) => ({ ...conversa, mensagens: (conversa.mensagens || []).sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm)).slice(0, 1) }));
+  }
+  async listarMensagens(usuarioId, conversaId) { const conversa = await this.buscarUm('Conversa', { id: conversaId, usuarioId }); if (!conversa) return null; const { data } = await this.executar(this.criarCliente().from('Mensagem').select('*').eq('conversaId', conversaId).order('criadoEm', { ascending: true })); return data; }
+  async registrarEventoWebhook(dados) {
+    try {
+      const evento = await this.inserir('EventoWebhook', { id: criarId('whk'), recebidoEm: dataIso(), statusProcessamento: 'recebido', ...dados });
+      return { duplicado: false, evento };
+    } catch (erro) {
+      if (erro.code !== '23505') throw erro;
+      const evento = await this.buscarUm('EventoWebhook', { provedor: dados.provedor, identificadorEventoExterno: dados.identificadorEventoExterno });
+      return { duplicado: true, evento };
+    }
+  }
+
+  async listarConexoes(usuarioId) { const { data } = await this.executar(this.criarCliente().from('ConexaoCalendario').select('*').eq('usuarioId', usuarioId).order('provedor', { ascending: true })); return data; }
+  async buscarConexao(usuarioId, provedor) { return this.buscarUm('ConexaoCalendario', { usuarioId, provedor }); }
+  async salvarConexao(dados) {
+    const existente = await this.buscarConexao(dados.usuarioId, dados.provedor);
+    const agora = dataIso();
+    const { id, criadoEm, atualizadoEm, ...campos } = dados;
+    if (existente) {
+      const { data } = await this.executar(this.criarCliente().from('ConexaoCalendario').update({ ...campos, atualizadoEm: agora }).eq('id', existente.id).eq('usuarioId', dados.usuarioId).select().single());
+      return data;
+    }
+    return this.inserir('ConexaoCalendario', { id: criarId('cal'), status: 'conectado', criadoEm: agora, atualizadoEm: agora, ...campos });
+  }
+  async excluirConexao(usuarioId, provedor) { const { data } = await this.executar(this.criarCliente().from('ConexaoCalendario').delete().eq('usuarioId', usuarioId).eq('provedor', provedor).select('id').maybeSingle()); return Boolean(data); }
+  async criarEventoCalendario(dados) { const agora = dataIso(); return this.inserir('EventoCalendario', { id: criarId('evt'), criadoEm: agora, atualizadoEm: agora, ...dados, dataInicio: dataIso(dados.dataInicio), dataFim: dataIso(dados.dataFim) }); }
+  async criarRegistroSincronizacao(dados) { return this.inserir('RegistroSincronizacao', { id: criarId('sync'), iniciadoEm: dataIso(), ...dados, ...(dados.finalizadoEm ? { finalizadoEm: dataIso(dados.finalizadoEm) } : {}) }); }
+  async contarTarefas(usuarioId, filtros = {}) {
+    let consulta = this.criarCliente().from('Tarefa').select('*', { count: 'exact', head: true }).eq('usuarioId', usuarioId);
+    Object.entries(filtros).forEach(([campo, valor]) => { consulta = campo === 'dataEntregaAntes' ? consulta.lt('dataEntrega', valor) : consulta.eq(campo, valor); });
+    return (await this.executar(consulta)).count || 0;
+  }
+  async estatisticas(usuarioId) {
+    const agora = dataIso();
+    const [total, pendentes, concluidas, atrasadas, provas] = await Promise.all([
+      this.contarTarefas(usuarioId),
+      this.contarTarefas(usuarioId, { status: 'pendente' }),
+      this.contarTarefas(usuarioId, { status: 'concluida' }),
+      this.contarTarefas(usuarioId, { status: 'pendente', dataEntregaAntes: agora }),
+      this.executar(this.criarCliente().from('Tarefa').select('*').eq('usuarioId', usuarioId).eq('tipo', 'prova').eq('status', 'pendente').order('dataEntrega', { ascending: true }).limit(5))
+    ]);
+    return { total, pendentes, concluidas, atrasadas, provas: provas.data.map(normalizarTarefa) };
+  }
 }
 
 const usarMemoria = process.env.USAR_BANCO_MEMORIA === 'true';
-const repositorio = usarMemoria ? new RepositorioMemoria() : new RepositorioPrisma();
+const repositorio = usarMemoria ? new RepositorioMemoria() : new RepositorioSupabase();
 
-module.exports = { repositorio, clientePrisma, RepositorioMemoria, RepositorioPrisma };
+module.exports = { repositorio, criarClienteDados, RepositorioMemoria, RepositorioSupabase };

@@ -1,4 +1,4 @@
--- CreateSchema
+-- Schema inicial do Lembraí para o Supabase SQL Editor.
 CREATE SCHEMA IF NOT EXISTS "public";
 
 -- CreateEnum

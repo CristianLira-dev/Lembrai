@@ -165,10 +165,10 @@ test('API protege rotas, rejeita JWT local e restringe tarefas ao usuário valid
   assert.equal((await fetch(base + '/tarefas/' + outra.id, { headers })).status, 404);
 });
 
-test('API diferencia indisponibilidade do PostgreSQL de um erro interno genérico', async (t) => {
+test('API diferencia indisponibilidade da Data API de um erro interno genérico', async (t) => {
   const c = cenario();
   c.repositorio.verificarConexao = async () => {
-    throw Object.assign(new Error('connection refused'), { name: 'PrismaClientInitializationError', code: 'P1001' });
+    throw Object.assign(new Error('fetch failed'), { code: 'SUPABASE_DATA_API', statusCode: 503 });
   };
   const { app } = criarAplicacao({ servicos: { repositorio: c.repositorio, servicoAutenticacao: c.servico } });
   const servidor = app.listen(0, '127.0.0.1');

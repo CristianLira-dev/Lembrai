@@ -23,7 +23,6 @@ if (-not (Test-Path "$raiz\backend\node_modules")) {
   Write-Host 'Instalando dependências do backend...' -ForegroundColor Yellow
   Push-Location "$raiz\backend"
   npm install
-  npm run prisma:gerar
   Pop-Location
 }
 
