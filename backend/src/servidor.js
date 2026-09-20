@@ -42,7 +42,19 @@ function criarAplicacao(dependencias = {}) {
 
 const construida = criarAplicacao();
 if (require.main === module) {
-  construida.app.listen(ambiente.porta, () => logger.info({ porta: ambiente.porta }, 'backend iniciado'));
+  construida.app.listen(ambiente.porta, async () => {
+    logger.info({ porta: ambiente.porta }, 'backend iniciado');
+
+    if (ambiente.modoWhatsapp !== 'evolution') return;
+
+    const urlWebhook = `${ambiente.urlBackend.replace(/\/+$/, '')}/api/webhooks/evolution`;
+    try {
+      await construida.servicos.servicoWhatsapp.configurarWebhook(urlWebhook);
+      logger.info({ urlWebhook }, 'webhook da Evolution API configurado');
+    } catch (erro) {
+      logger.error({ erro, urlWebhook }, 'não foi possível configurar o webhook da Evolution API');
+    }
+  });
 }
 
 module.exports = { criarAplicacao, ...construida };
