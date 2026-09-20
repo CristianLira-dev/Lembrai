@@ -18,6 +18,17 @@ function criarClienteAuth() {
   });
 }
 
+function criarClienteAuthAdmin() {
+  if (!ambiente.supabaseUrl || !ambiente.supabaseChaveSecreta) {
+    throw falha('Autenticação indisponível. Configure a chave secreta do Supabase no servidor.', 503);
+  }
+  // Cliente administrativo exclusivo do backend. A chave secreta nunca vai para o navegador.
+  return createClient(ambiente.supabaseUrl, ambiente.supabaseChaveSecreta, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    global: { fetch: (url, opcoes) => fetch(url, { ...opcoes, signal: AbortSignal.timeout(10000) }) }
+  });
+}
+
 function traduzirErro(erro) {
   const mensagens = {
     invalid_credentials: 'E-mail ou senha inválidos',
@@ -35,7 +46,7 @@ function traduzirErro(erro) {
   return falha(mensagens[erro.code] || 'Não foi possível autenticar. Verifique seus dados.', 400);
 }
 
-function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth) {
+function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, criarClienteAdmin = criarClienteAuthAdmin) {
   async function verificarToken(token) {
     // getUser consulta o Auth deste projeto e valida o JWT e sua expiração.
     const { data, error } = await criarCliente().auth.getUser(token);
@@ -86,34 +97,31 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth) 
     async cadastrar(dados) {
       if (await repositorio.buscarUsuarioPorEmail(dados.email)) throw falha('E-mail já cadastrado', 409);
       if (await repositorio.buscarUsuarioPorTelefone(dados.telefone)) throw falha('WhatsApp já cadastrado', 409);
-      const { data, error } = await criarCliente().auth.signUp({
-        email: dados.email, password: dados.senha,
-        options: {
-          emailRedirectTo: `${ambiente.urlFrontend.replace(/\/$/, '')}/entrar`,
-          data: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario }
-        }
+      const clienteAdmin = criarClienteAdmin();
+      const { data: cadastro, error: erroCadastro } = await clienteAdmin.auth.admin.createUser({
+        email: dados.email,
+        password: dados.senha,
+        email_confirm: true,
+        user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario }
       });
-      if (error) throw traduzirErro(error);
-      return { sessao: data.session, confirmarEmail: !data.session };
+      if (erroCadastro) throw traduzirErro(erroCadastro);
+
+      const { data: entrada, error: erroEntrada } = await criarCliente().auth.signInWithPassword({
+        email: dados.email,
+        password: dados.senha
+      });
+      if (erroEntrada || !entrada.session) {
+        // Evita deixar uma conta sem acesso se o login imediato falhar.
+        if (cadastro.user?.id) await clienteAdmin.auth.admin.deleteUser(cadastro.user.id).catch(() => {});
+        if (erroEntrada) throw traduzirErro(erroEntrada);
+        throw falha('Não foi possível iniciar sua sessão. Tente novamente.', 503);
+      }
+      return { sessao: entrada.session };
     },
     async entrar(dados) {
       const { data, error } = await criarCliente().auth.signInWithPassword({ email: dados.email, password: dados.senha });
       if (error) throw traduzirErro(error);
       return { sessao: data.session };
-    },
-    async confirmarEmail({ email, codigo }) {
-      const { data, error } = await criarCliente().auth.verifyOtp({ email, token: codigo, type: 'email' });
-      if (error) throw traduzirErro(error);
-      if (!data.session) throw falha('Não foi possível iniciar sua sessão. Solicite um novo código.', 400);
-      return { sessao: data.session };
-    },
-    async reenviarCodigo({ email }) {
-      const { error } = await criarCliente().auth.resend({
-        type: 'signup', email,
-        options: { emailRedirectTo: `${ambiente.urlFrontend.replace(/\/$/, '')}/cadastro` }
-      });
-      if (error) throw traduzirErro(error);
-      return { enviado: true };
     }
   };
 }

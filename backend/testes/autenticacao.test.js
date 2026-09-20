@@ -11,38 +11,48 @@ const { criarAplicacao } = require('../src/servidor');
 
 const dados = { nome: 'Estudante', email: 'aluno@example.com', telefone: '5511999999999', senha: 'senha-segura' };
 const identidade = { id: '347c0a42-26bf-4791-a181-e1b5379e1064', email: dados.email, email_confirmed_at: '2026-09-06T00:00:00Z', user_metadata: { nome: dados.nome, telefone: dados.telefone } };
+const sessao = { access_token: 'jwt-do-supabase', refresh_token: 'refresh-do-supabase' };
 function resposta() {
   return { statusCode: 200, body: null, status(n) { this.statusCode = n; return this; }, json(d) { this.body = d; return this; } };
 }
-function cenario(auth = {}) {
+function cenario(auth = {}, admin = {}) {
   const repositorio = new RepositorioMemoria();
   const chamadas = [];
+  const chamadasAdmin = [];
   const cliente = { auth: {
-    async signUp(d) { chamadas.push(d); return { data: { user: identidade, session: null }, error: null }; },
-    async signInWithPassword(d) { chamadas.push(d); return { data: { session: { access_token: 'jwt-do-supabase', refresh_token: 'refresh-do-supabase' } }, error: null }; },
+    async signInWithPassword(d) { chamadas.push(d); return { data: { session: sessao }, error: null }; },
     async getUser(token) {
       chamadas.push(token);
       return token === 'valido' ? { data: { user: identidade }, error: null }
         : { data: { user: null }, error: { status: 401 } };
     },
-    async verifyOtp(d) { chamadas.push(d); return { data: { session: { access_token: 'jwt-otp', refresh_token: 'refresh-otp' } }, error: null }; },
-    async resend(d) { chamadas.push(d); return { data: {}, error: null }; },
     ...auth
   } };
-  const servico = criarServicoAutenticacao(repositorio, () => cliente);
-  return { repositorio, servico, controlador: criarControladorAutenticacao(servico), chamadas };
+  const clienteAdmin = { auth: { admin: {
+    async createUser(d) { chamadasAdmin.push({ operacao: 'criar', dados: d }); return { data: { user: identidade }, error: null }; },
+    async deleteUser(id) { chamadasAdmin.push({ operacao: 'excluir', id }); return { data: {}, error: null }; },
+    ...admin
+  } } };
+  const servico = criarServicoAutenticacao(repositorio, () => cliente, () => clienteAdmin);
+  return { repositorio, servico, controlador: criarControladorAutenticacao(servico), chamadas, chamadasAdmin };
 }
 
-test('cadastro normaliza os dados e aguarda confirmação sem criar senha local', async () => {
+test('cadastro confirma a conta no servidor e inicia a sessão sem enviar e-mail', async () => {
   const c = cenario();
   const res = resposta();
   await c.controlador.cadastrar({ body: { ...dados, email: 'ALUNO@example.com', telefone: '+55 (11) 99999-9999' } }, res);
   assert.equal(res.statusCode, 201);
-  assert.deepEqual(res.body, { sessao: null, confirmarEmail: true });
-  assert.equal(c.chamadas[0].email, dados.email);
-  assert.equal(c.chamadas[0].options.data.telefone, dados.telefone);
-  assert.equal(c.chamadas[0].options.data.senha, undefined);
-  assert.equal(c.chamadas[0].options.emailRedirectTo, 'http://localhost:5173/entrar');
+  assert.deepEqual(res.body, { sessao });
+  assert.deepEqual(c.chamadasAdmin[0], {
+    operacao: 'criar',
+    dados: {
+      email: dados.email,
+      password: dados.senha,
+      email_confirm: true,
+      user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: 'America/Sao_Paulo' }
+    }
+  });
+  assert.deepEqual(c.chamadas[0], { email: dados.email, password: dados.senha });
   assert.equal(c.repositorio.usuarios.length, 0);
 });
 
@@ -51,6 +61,7 @@ test('valida os campos obrigatórios de cadastro antes de chamar o Auth', async 
   await assert.rejects(() => c.controlador.cadastrar({ body: { ...dados, telefone: '' } }, resposta()), { statusCode: 400 });
   await assert.rejects(() => c.controlador.cadastrar({ body: { ...dados, senha: 'curta' } }, resposta()), { statusCode: 400 });
   assert.equal(c.chamadas.length, 0);
+  assert.equal(c.chamadasAdmin.length, 0);
 });
 
 test('login exige apenas e-mail e senha e devolve a sessão emitida pelo Supabase', async () => {
@@ -62,35 +73,12 @@ test('login exige apenas e-mail e senha e devolve a sessão emitida pelo Supabas
   assert.equal(res.body.token, undefined);
 });
 
-test('cadastro pode devolver sessão imediata quando o Auth não exige confirmação', async () => {
-  const sessao = { access_token: 'jwt', refresh_token: 'refresh' };
-  const c = cenario({ signUp: async () => ({ data: { session: sessao }, error: null }) });
-  assert.deepEqual(await c.servico.cadastrar(dados), { sessao, confirmarEmail: false });
-});
-
-test('confirma cadastro com o OTP de seis dígitos e devolve a sessão', async () => {
-  const c = cenario();
-  const resultado = await c.servico.confirmarEmail({ email: dados.email, codigo: '123456' });
-  assert.equal(resultado.sessao.access_token, 'jwt-otp');
-  assert.deepEqual(c.chamadas[0], { email: dados.email, token: '123456', type: 'email' });
-});
-
-test('reenvia o código de confirmação sem criar outra conta', async () => {
-  const c = cenario();
-  assert.deepEqual(await c.servico.reenviarCodigo({ email: dados.email }), { enviado: true });
-  assert.deepEqual(c.chamadas[0], {
-    type: 'signup', email: dados.email,
-    options: { emailRedirectTo: 'http://localhost:5173/cadastro' }
+test('remove a conta criada se o login imediato falhar', async () => {
+  const c = cenario({
+    signInWithPassword: async () => ({ data: {}, error: { status: 503 } })
   });
-});
-
-test('API rejeita código de confirmação fora do formato de seis dígitos', async () => {
-  const c = cenario();
-  await assert.rejects(
-    () => c.controlador.confirmarEmail({ body: { email: dados.email, codigo: 'A1234' } }, resposta()),
-    { statusCode: 400 }
-  );
-  assert.equal(c.chamadas.length, 0);
+  await assert.rejects(() => c.servico.cadastrar(dados), { statusCode: 503 });
+  assert.deepEqual(c.chamadasAdmin[1], { operacao: 'excluir', id: identidade.id });
 });
 
 test('traduz credenciais inválidas, e-mail não confirmado, limite e indisponibilidade', async () => {
@@ -117,6 +105,7 @@ test('impede cadastro com WhatsApp já utilizado', async () => {
   await c.repositorio.criarUsuario({ ...dados, email: 'outro@example.com' });
   await assert.rejects(() => c.servico.cadastrar(dados), { statusCode: 409 });
   assert.equal(c.chamadas.length, 0);
+  assert.equal(c.chamadasAdmin.length, 0);
 });
 
 test('perfil usa exclusivamente a identidade validada e não aceita permissões de metadata', async () => {

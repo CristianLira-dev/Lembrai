@@ -7,7 +7,7 @@ import { RotuloCampo } from '../componentes/RotuloCampo';
 import { formatarWhatsApp } from '../utilitarios/telefone';
 
 export function PaginaCadastro() {
-  const { cadastrar, confirmarEmail, reenviarCodigo } = useAutenticacao();
+  const { cadastrar } = useAutenticacao();
   const navegar = useNavigate();
 
   const [dados, setDados] = useState({
@@ -17,11 +17,7 @@ export function PaginaCadastro() {
     senha: ''
   });
   const [erro, setErro] = useState('');
-  const [mensagem, setMensagem] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const [reenviando, setReenviando] = useState(false);
-  const [codigo, setCodigo] = useState('');
-  const [emailConfirmacao, setEmailConfirmacao] = useState(() => sessionStorage.getItem('lembrai_email_confirmacao') || '');
 
   const alterar = (evento) => {
     const { name, value } = evento.target;
@@ -35,7 +31,6 @@ export function PaginaCadastro() {
   async function enviar(evento) {
     evento.preventDefault();
     setErro('');
-    setMensagem('');
 
     const telefone = dados.telefone.replace(/\D/g, '');
 
@@ -52,67 +47,16 @@ export function PaginaCadastro() {
     setEnviando(true);
 
     try {
-      const resultado = await cadastrar({
+      await cadastrar({
         ...dados,
         telefone
       });
-
-      if (resultado.confirmarEmail) {
-        const email = dados.email.trim().toLowerCase();
-        sessionStorage.setItem('lembrai_email_confirmacao', email);
-        setEmailConfirmacao(email);
-        setMensagem('Enviamos um código de 6 dígitos para seu e-mail.');
-        setDados((atual) => ({ ...atual, senha: '' }));
-      } else {
-        navegar('/painel', { replace: true });
-      }
+      navegar('/painel', { replace: true });
     } catch (erroApi) {
       setErro(erroApi.message || 'Não foi possível criar sua conta.');
     } finally {
       setEnviando(false);
     }
-  }
-
-  async function confirmar(evento) {
-    evento.preventDefault();
-    setErro('');
-    setMensagem('');
-    if (!/^\d{6}$/.test(codigo)) {
-      setErro('Informe o código de 6 dígitos enviado por e-mail.');
-      return;
-    }
-    setEnviando(true);
-    try {
-      await confirmarEmail(emailConfirmacao, codigo);
-      sessionStorage.removeItem('lembrai_email_confirmacao');
-      navegar('/painel', { replace: true });
-    } catch (erroApi) {
-      setErro(erroApi.message || 'Não foi possível confirmar seu e-mail.');
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  async function reenviar() {
-    setErro('');
-    setMensagem('');
-    setReenviando(true);
-    try {
-      await reenviarCodigo(emailConfirmacao);
-      setMensagem('Enviamos um novo código. Confira também a pasta de spam.');
-    } catch (erroApi) {
-      setErro(erroApi.message || 'Não foi possível reenviar o código.');
-    } finally {
-      setReenviando(false);
-    }
-  }
-
-  function trocarEmail() {
-    sessionStorage.removeItem('lembrai_email_confirmacao');
-    setEmailConfirmacao('');
-    setCodigo('');
-    setErro('');
-    setMensagem('');
   }
 
   return (
@@ -136,13 +80,11 @@ export function PaginaCadastro() {
 
       <div className="autenticacao-forma">
         <div className="caixa-autenticacao">
-          <p className="etiqueta">{emailConfirmacao ? 'Confirme seu e-mail' : 'Comece por aqui'}</p>
-          <h2>{emailConfirmacao ? 'Digite o código' : 'Crie seu espaço'}</h2>
+          <p className="etiqueta">Comece por aqui</p>
+          <h2>Crie seu espaço</h2>
 
           <p className="subtitulo">
-            {emailConfirmacao
-              ? <>Enviamos um código de 6 dígitos para <strong>{emailConfirmacao}</strong>.</>
-              : 'Uma conta para suas tarefas, calendários e lembretes na Lembraí.'}
+            Uma conta para suas tarefas, calendários e lembretes na Lembraí.
           </p>
 
           {erro && (
@@ -151,35 +93,7 @@ export function PaginaCadastro() {
             </div>
           )}
 
-          {mensagem && <div className="alerta" role="status">{mensagem}</div>}
-
-          {emailConfirmacao ? (
-            <form onSubmit={confirmar}>
-              <div className="campo campo-codigo">
-                <RotuloCampo htmlFor="codigo" obrigatorio>Código de confirmação</RotuloCampo>
-                <input
-                  id="codigo"
-                  name="codigo"
-                  value={codigo}
-                  onChange={(evento) => setCodigo(evento.target.value.replace(/\D/g, '').slice(0, 6))}
-                  required
-                  minLength="6"
-                  maxLength="6"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  placeholder="000000"
-                  autoFocus
-                />
-              </div>
-              <button className="botao primario" disabled={enviando} type="submit">
-                {enviando ? 'Confirmando...' : 'Confirmar e entrar →'}
-              </button>
-              <button className="botao secundario" disabled={reenviando} type="button" onClick={reenviar}>
-                {reenviando ? 'Reenviando...' : 'Reenviar código'}
-              </button>
-              <button className="botao-link" type="button" onClick={trocarEmail}>Usar outro e-mail</button>
-            </form>
-          ) : <form onSubmit={enviar}>
+          <form onSubmit={enviar}>
             <div className="campo">
               <RotuloCampo htmlFor="nome" obrigatorio>
                 Como podemos chamar você?
@@ -260,7 +174,7 @@ export function PaginaCadastro() {
             >
               {enviando ? 'Criando...' : 'Criar meu espaço →'}
             </button>
-          </form>}
+          </form>
 
           <p className="link-autenticacao">
             Já tem uma conta? <Link to="/entrar">Entrar</Link>

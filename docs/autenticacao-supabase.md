@@ -1,6 +1,6 @@
 # Autenticação e dados do Lembraí com Supabase
 
-O Supabase Auth gerencia cadastro, confirmação de e-mail, login e renovação da sessão. O navegador guarda a sessão do SDK e envia o access token JWT à API. O backend valida o token com `auth.getUser(token)` antes de acessar os dados.
+O Supabase Auth gerencia cadastro, login e renovação da sessão. Temporariamente, o backend confirma o e-mail no momento do cadastro, inicia a sessão imediatamente e não envia mensagem de verificação. O navegador guarda a sessão do SDK e envia o access token JWT à API. O backend valida o token com `auth.getUser(token)` antes de acessar os dados.
 
 ## Variáveis
 
@@ -26,26 +26,16 @@ A chave publicável pode ser usada no navegador. A chave secreta acessa a Data A
 
 Execute [`supabase/schema.sql`](../supabase/schema.sql) uma vez no SQL Editor para criar as tabelas. O backend usa `@supabase/supabase-js`; não precisa de string de conexão do PostgreSQL nem de geração de cliente.
 
-## URLs do Auth
+## Cadastro temporariamente sem confirmação
 
-Em **Authentication → URL Configuration**, defina o Site URL e permita `http://localhost:5173/entrar` no desenvolvimento. Em produção, permita a URL HTTPS real terminada em `/entrar`, atualize `URL_FRONTEND`, `CORS_ORIGENS` e `VITE_URL_API` e faça um novo deploy.
+O endpoint de cadastro usa `auth.admin.createUser` com `email_confirm: true` exclusivamente no backend e depois cria a sessão com e-mail e senha. Isso evita o envio de e-mail enquanto o SMTP e as URLs de retorno não estão configurados. `SUPABASE_SECRET_KEY` é obrigatória no Render e nunca pode ser exposta em uma variável `VITE_`.
 
-### Código de confirmação
-
-Em **Authentication → Emails → Confirm signup**, use `{{ .Token }}` para enviar o código nativo de seis dígitos:
-
-```html
-<h2>Confirme seu cadastro na Lembraí</h2>
-<p>Digite este código na tela de cadastro:</p>
-<p style="font-size: 28px; font-weight: 700; letter-spacing: 8px;">{{ .Token }}</p>
-```
-
-O frontend troca o código por uma sessão com `verifyOtp`. O código não é armazenado pela aplicação.
+Quando a verificação por e-mail for reativada, substitua esse fluxo pelo `signUp` público, configure as URLs em **Authentication → URL Configuration** e implemente novamente a etapa de confirmação na interface.
 
 ## Identidade e segurança
 
 - `Usuario.id` recebe o UUID validado pelo Supabase Auth.
-- O perfil é criado no primeiro acesso após a confirmação do e-mail.
+- O perfil é criado no primeiro acesso autenticado.
 - `senhaCriptografada` permanece apenas como campo legado e recebe `!supabase-auth`; senhas reais ficam exclusivamente no Auth.
 - Todas as consultas do backend filtram explicitamente por `usuarioId`.
 - O navegador não acessa as tabelas diretamente.
@@ -69,4 +59,4 @@ npm --prefix frontend test
 npm --prefix frontend run build
 ```
 
-Referências: [sessões](https://supabase.com/docs/guides/auth/sessions), [getUser](https://supabase.com/docs/reference/javascript/auth-getuser), [signUp](https://supabase.com/docs/reference/javascript/auth-signup) e [Data API](https://supabase.com/docs/guides/api).
+Referências: [sessões](https://supabase.com/docs/guides/auth/sessions), [getUser](https://supabase.com/docs/reference/javascript/auth-getuser), [criação administrativa de usuário](https://supabase.com/docs/reference/javascript/auth-admin-createuser) e [Data API](https://supabase.com/docs/guides/api).

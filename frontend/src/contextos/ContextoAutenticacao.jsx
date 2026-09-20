@@ -89,21 +89,7 @@ export function ProvedorAutenticacao({ children }) {
     exigirSupabase();
     setErroSessao('');
     const resposta = await api.cadastrar(dados);
-    if (resposta.data.sessao) await aceitarSessao(resposta.data.sessao);
-    return { confirmarEmail: resposta.data.confirmarEmail };
-  }
-
-  async function confirmarEmail(email, codigo) {
-    exigirSupabase();
-    setErroSessao('');
-    const resposta = await api.confirmarEmail({ email, codigo });
     await aceitarSessao(resposta.data.sessao);
-  }
-
-  async function reenviarCodigo(email) {
-    exigirSupabase();
-    setErroSessao('');
-    await api.reenviarCodigo({ email });
   }
 
   async function sair() {
@@ -114,7 +100,7 @@ export function ProvedorAutenticacao({ children }) {
   }
 
   const valor = useMemo(() => ({
-    usuario, carregando, erroSessao, autenticado: Boolean(usuario), entrar, cadastrar, confirmarEmail, reenviarCodigo, sair
+    usuario, carregando, erroSessao, autenticado: Boolean(usuario), entrar, cadastrar, sair
   }), [usuario, carregando, erroSessao]);
   return <ContextoAutenticacao.Provider value={valor}>{children}</ContextoAutenticacao.Provider>;
 }
