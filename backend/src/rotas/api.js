@@ -6,6 +6,7 @@ const { criarControladorTarefas } = require('../controladores/tarefas-controlado
 const { criarControladorLembretes } = require('../controladores/lembretes-controlador');
 const { criarControladorWebhook } = require('../controladores/webhook-controlador');
 const { criarControladorPainel } = require('../controladores/painel-controlador');
+const { diagnosticoConsultaEvolution } = require('../consulta-mensagens-evolution');
 
 function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCalendarios, filaMensagens, servicoAssistente, servicoAutenticacao = criarServicoAutenticacao(repositorio) }) {
   const rotas = express.Router();
@@ -46,6 +47,11 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   rotas.post('/webhooks/evolution', validarSegredoWebhook, webhook.evolution);
   rotas.post('/webhooks/evolution/simular', validarSegredoWebhook, webhook.simular);
   rotas.get('/saude', (req, res) => res.json({ status: 'ok', servico: 'backend', data: new Date().toISOString() }));
+  rotas.get('/saude/evolution', (req, res) => res.json({
+    status: diagnosticoConsultaEvolution.codigoErro ? 'degradado' : 'ok',
+    servico: 'evolution-polling',
+    ...diagnosticoConsultaEvolution
+  }));
   rotas.get('/saude/banco', async (req, res, next) => {
     try {
       await repositorio.verificarConexao();

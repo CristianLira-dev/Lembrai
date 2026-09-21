@@ -3,7 +3,7 @@ process.env.USAR_FILAS_MEMORIA = 'true';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { iniciarConsultaMensagensEvolution } = require('../src/consulta-mensagens-evolution');
+const { diagnosticoConsultaEvolution, iniciarConsultaMensagensEvolution } = require('../src/consulta-mensagens-evolution');
 
 test('recupera mensagem recebida e ignora mensagens enviadas pelo próprio bot', async () => {
   const eventos = new Set();
@@ -39,13 +39,15 @@ test('recupera mensagem recebida e ignora mensagens enviadas pelo próprio bot',
     agora: () => agora
   });
 
-  await consulta.consultarAgora();
+  await consulta.pronto;
   await consulta.consultarAgora();
   consulta.parar();
 
   assert.equal(entradas.length, 1);
   assert.equal(entradas[0].telefone, '5513996873783');
   assert.equal(entradas[0].texto, 'olá');
+  assert.equal(diagnosticoConsultaEvolution.consultadas, 2);
+  assert.equal(diagnosticoConsultaEvolution.codigoErro, null);
 });
 
 test('ignora histórico anterior à janela inicial e mensagens de grupos', async () => {
@@ -66,7 +68,7 @@ test('ignora histórico anterior à janela inicial e mensagens de grupos', async
     agora: () => agora
   });
 
-  await consulta.consultarAgora();
+  await consulta.pronto;
   consulta.parar();
   assert.equal(entradas.length, 0);
 });

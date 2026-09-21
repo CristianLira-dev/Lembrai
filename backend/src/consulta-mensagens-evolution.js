@@ -1,6 +1,16 @@
 const logger = require('./configuracao/logger');
 const { extrairTextoMensagem, normalizarTelefone } = require('./integracoes/evolution-api/provedor-evolution-api');
 
+const diagnosticoConsultaEvolution = {
+  ativo: false,
+  ultimaConsulta: null,
+  ultimaFalha: null,
+  consultadas: 0,
+  processadas: 0,
+  codigoErro: null,
+  statusHttp: null
+};
+
 function obterJidContato(mensagem = {}) {
   const chave = mensagem.key || {};
   const principal = chave.remoteJid || '';
@@ -25,6 +35,7 @@ function iniciarConsultaMensagensEvolution({
 }) {
   const inicioDaJanela = agora() - janelaInicialMs;
   let executando = false;
+  diagnosticoConsultaEvolution.ativo = true;
 
   async function consultarAgora() {
     if (executando) return { ignorado: true, motivo: 'consulta_em_andamento' };
@@ -65,8 +76,21 @@ function iniciarConsultaMensagensEvolution({
       }
 
       if (processadas) logger.info({ processadas }, 'mensagens recuperadas pelo fallback da Evolution');
+      Object.assign(diagnosticoConsultaEvolution, {
+        ultimaConsulta: new Date(agora()).toISOString(),
+        consultadas: mensagens.length,
+        processadas,
+        codigoErro: null,
+        statusHttp: null
+      });
       return { consultadas: mensagens.length, processadas };
     } catch (erro) {
+      Object.assign(diagnosticoConsultaEvolution, {
+        ultimaConsulta: new Date(agora()).toISOString(),
+        ultimaFalha: new Date(agora()).toISOString(),
+        codigoErro: erro.code || 'ERRO_EVOLUTION',
+        statusHttp: erro.response?.status || null
+      });
       logger.error({ erro: erro.message, codigo: erro.code }, 'falha ao consultar mensagens na Evolution');
       return { erro };
     } finally {
@@ -76,14 +100,16 @@ function iniciarConsultaMensagensEvolution({
 
   const timer = setInterval(consultarAgora, intervaloMs);
   timer.unref?.();
-  consultarAgora();
+  const pronto = consultarAgora();
 
   return {
+    pronto,
     consultarAgora,
     parar() {
       clearInterval(timer);
+      diagnosticoConsultaEvolution.ativo = false;
     }
   };
 }
 
-module.exports = { iniciarConsultaMensagensEvolution, obterJidContato, timestampEmMilissegundos };
+module.exports = { diagnosticoConsultaEvolution, iniciarConsultaMensagensEvolution, obterJidContato, timestampEmMilissegundos };
