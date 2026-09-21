@@ -117,3 +117,51 @@ test('mesma mensagem externa não é processada duas vezes', async () => {
   assert.equal(segundo.duplicado, true);
   assert.equal(cenario.chatbot.chamadas, 1);
 });
+
+test('fallback local registra atividade no usuário identificado pelo telefone', async () => {
+  const cenario = criarCenario([]);
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuarioCorreto = await criarUsuario(cenario, '5511999999999');
+  const outroUsuario = await cenario.repositorio.criarUsuario({
+    id: 'auth-user-2', nome: 'Outro', email: 'outro@example.com',
+    senhaCriptografada: 'supabase-auth', telefone: '5511888888888'
+  });
+
+  const proposta = await cenario.assistente.processarEntrada({
+    telefone: usuarioCorreto.telefone,
+    texto: 'trabalho de Banco de Dados dia 25/09/2027 às 19h',
+    identificadorExterno: 'fallback-1',
+    recebidoEm: new Date('2026-09-21T15:00:00Z')
+  });
+  assert.match(proposta.resposta, /Vou registrar:.*Banco De Dados.*25\/09\/2027.*19:00.*Confirma/);
+  assert.equal((await cenario.tarefas.listar(usuarioCorreto.id)).length, 0);
+
+  await cenario.assistente.processarEntrada({
+    telefone: usuarioCorreto.telefone,
+    texto: 'sim',
+    identificadorExterno: 'fallback-2',
+    recebidoEm: new Date('2026-09-21T15:01:00Z')
+  });
+
+  const tarefasCorretas = await cenario.tarefas.listar(usuarioCorreto.id);
+  assert.equal(tarefasCorretas.length, 1);
+  assert.equal(tarefasCorretas[0].usuarioId, usuarioCorreto.id);
+  assert.equal(tarefasCorretas[0].materia, 'Banco De Dados');
+  assert.equal((await cenario.tarefas.listar(outroUsuario.id)).length, 0);
+});
+
+test('fallback local coleta apenas o dado ausente antes de confirmar', async () => {
+  const cenario = criarCenario([]);
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+
+  const primeira = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'atividade dia 28/09/2027', identificadorExterno: 'coleta-1'
+  });
+  assert.equal(primeira.resposta, 'Qual é a matéria?');
+
+  const segunda = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'Engenharia de Software', identificadorExterno: 'coleta-2'
+  });
+  assert.match(segunda.resposta, /Vou registrar:.*Engenharia De Software.*Confirma/);
+});

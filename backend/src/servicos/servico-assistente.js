@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { z } = require('zod');
 const { ServicoChatbot, codigoSeguroErroChatbot } = require('./servico-chatbot');
+const { interpretarLocal } = require('./interpretador-local');
 const { dataNoFuso, dataValida, horarioValido, dataHorarioNoFuso, somarDias, formatarData } = require('../utilitarios/datas');
 const { normalizarTelefone } = require('../utilitarios/telefone');
 
@@ -25,7 +26,10 @@ function comandoExplicito(texto) {
   if (/^(nao|n|cancelar|cancela|deixa pra la|nao quero)$/.test(t)) return 'cancel';
   return null;
 }
-function textoFallback(texto) { return { intent: comandoExplicito(texto) || 'unavailable', response: FALHA }; }
+function textoFallback(texto, opcoes = {}) {
+  const comando = comandoExplicito(texto);
+  return comando ? { intent: comando } : interpretarLocal({ texto, ...opcoes });
+}
 function dadosTarefa(t) {
   return Object.fromEntries(Object.entries(t || {}).filter(([k, v]) => ['title', 'subject', 'dueDate', 'dueTime', 'type'].includes(k) && v != null && v !== '').map(([k, v]) => [k, limpo(v)]));
 }
@@ -258,7 +262,7 @@ class ServicoAssistente {
             context: { pendingAction: pendente, recentTasks: tarefas.slice(0, 50).map((t) => ({ titulo: t.titulo, materia: t.materia, dataEntrega: t.dataEntrega, horarioEntrega: t.horarioEntrega, status: t.status })), subjects: materias.map((m) => m.nome), reminderTime: usuario.horarioLembretes || '07:27' }
           });
         } catch (erro) {
-          interpretacao = textoFallback(texto);
+          interpretacao = textoFallback(texto, { recebidoEm, fuso: usuario.fusoHorario, pendente });
           interpretacao.generation = {
             provider: 'chatbot',
             status: 'fallback',
