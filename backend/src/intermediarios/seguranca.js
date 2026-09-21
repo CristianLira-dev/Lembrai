@@ -1,4 +1,12 @@
 const ambiente = require('../configuracao/ambiente');
+const crypto = require('node:crypto');
+
+function compararSegredos(recebido, esperado) {
+  if (!recebido || !esperado) return false;
+  const a = Buffer.from(String(recebido));
+  const b = Buffer.from(String(esperado));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
 
 function criarAutenticador(servicoAutenticacao) {
   return async (req, res, proximo) => {
@@ -16,9 +24,16 @@ function criarAutenticador(servicoAutenticacao) {
 }
 
 function validarSegredoWebhook(req, res, proximo) {
-  const token = req.headers['x-webhook-secret'] || req.headers.authorization?.replace(/^Bearer\s+/i, '');
+  // A Evolution envia a apikey no corpo do evento. O painel Manager não expõe
+  // um campo para cabeçalhos personalizados, então aceitamos também o segredo
+  // configurado no header quando a configuração é feita pela API.
+  const token = req.headers['x-webhook-secret']
+    || req.headers.authorization?.replace(/^Bearer\s+/i, '')
+    || req.body?.apikey;
   if (ambiente.ambiente === 'desenvolvimento' && !process.env.EVOLUTION_WEBHOOK_SEGREDO) return proximo();
-  if (!token || token !== ambiente.evolutionWebhookSegredo) return res.status(401).json({ erro: 'Webhook não autorizado' });
+  const headerValido = compararSegredos(token, ambiente.evolutionWebhookSegredo);
+  const apikeyValida = compararSegredos(req.body?.apikey, ambiente.evolutionChave);
+  if (!headerValido && !apikeyValida) return res.status(401).json({ erro: 'Webhook não autorizado' });
   return proximo();
 }
 
