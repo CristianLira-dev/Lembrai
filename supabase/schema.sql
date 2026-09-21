@@ -24,10 +24,26 @@ CREATE TABLE "Usuario" (
     "email" TEXT NOT NULL,
     "senhaCriptografada" TEXT NOT NULL,
     "fusoHorario" TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
+    "horarioLembretes" TEXT NOT NULL DEFAULT '07:27',
+    "preferenciaLembretesPerguntada" BOOLEAN NOT NULL DEFAULT false,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
-    CONSTRAINT "Usuario_pkey" PRIMARY KEY ("id")
+    CONSTRAINT "Usuario_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Usuario_horarioLembretes_check" CHECK ("horarioLembretes" ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$')
+);
+
+-- CreateTable
+CREATE TABLE "Materia" (
+    "id" TEXT NOT NULL,
+    "usuarioId" TEXT NOT NULL,
+    "nome" TEXT NOT NULL,
+    "normalizado" TEXT NOT NULL,
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "Materia_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "Materia_nome_check" CHECK (char_length("nome") BETWEEN 1 AND 120),
+    CONSTRAINT "Materia_normalizado_check" CHECK (char_length("normalizado") BETWEEN 1 AND 120)
 );
 
 -- CreateTable
@@ -123,6 +139,7 @@ CREATE TABLE "Mensagem" (
     "conteudo" TEXT NOT NULL,
     "tipoMensagem" TEXT NOT NULL DEFAULT 'texto',
     "statusProcessamento" TEXT NOT NULL DEFAULT 'pendente',
+    "metadados" JSONB,
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
@@ -163,6 +180,12 @@ CREATE UNIQUE INDEX "Usuario_telefone_key" ON "Usuario"("telefone");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "Usuario_email_key" ON "Usuario"("email");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "Materia_usuarioId_normalizado_key" ON "Materia"("usuarioId", "normalizado");
+
+-- CreateIndex
+CREATE INDEX "Materia_usuarioId_nome_idx" ON "Materia"("usuarioId", "nome");
 
 -- CreateIndex
 CREATE INDEX "Tarefa_usuarioId_status_idx" ON "Tarefa"("usuarioId", "status");
@@ -216,6 +239,9 @@ CREATE INDEX "RegistroSincronizacao_usuarioId_provedor_iniciadoEm_idx" ON "Regis
 ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "Materia" ADD CONSTRAINT "Materia_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "ConexaoCalendario" ADD CONSTRAINT "ConexaoCalendario_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
@@ -242,3 +268,5 @@ ALTER TABLE "EventoWebhook" ADD CONSTRAINT "EventoWebhook_usuarioId_fkey" FOREIG
 -- AddForeignKey
 ALTER TABLE "RegistroSincronizacao" ADD CONSTRAINT "RegistroSincronizacao_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
+ALTER TABLE "Materia" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "Materia" FROM anon, authenticated;

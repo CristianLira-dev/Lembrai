@@ -44,7 +44,7 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   rotas.post('/calendarios/:provedor/sincronizar', autenticar, painel.sincronizarCalendario);
 
   rotas.post('/webhooks/evolution', validarSegredoWebhook, webhook.evolution);
-  rotas.post('/webhooks/evolution/simular', webhook.simular);
+  rotas.post('/webhooks/evolution/simular', validarSegredoWebhook, webhook.simular);
   rotas.get('/saude', (req, res) => res.json({ status: 'ok', servico: 'backend', data: new Date().toISOString() }));
   rotas.get('/saude/banco', async (req, res, next) => {
     try {

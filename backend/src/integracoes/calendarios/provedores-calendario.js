@@ -13,6 +13,10 @@ class ProvedorCalendarioSimulado {
 }
 
 class ProvedorGoogleCalendar {
+  async atualizarEvento(id, evento, tokens, calendarId = 'primary') {
+    const resposta = await axios.patch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(id)}`, { summary: evento.titulo, description: evento.descricao, start: { dateTime: evento.dataInicio, timeZone: evento.fusoHorario }, end: { dateTime: evento.dataFim, timeZone: evento.fusoHorario } }, { timeout: 10000, headers: { Authorization: `Bearer ${tokens.accessToken}` } });
+    return { externalEventId: resposta.data.id };
+  }
   disponivel() { return Boolean(ambiente.google.clientId && ambiente.google.clientSecret); }
   urlAutorizacao(estado) {
     if (!this.disponivel()) return null;
@@ -31,6 +35,10 @@ class ProvedorGoogleCalendar {
 }
 
 class ProvedorOutlookCalendar {
+  async atualizarEvento(id, evento, tokens) {
+    const resposta = await axios.patch(`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(id)}`, { subject: evento.titulo, body: { contentType: 'Text', content: evento.descricao || '' }, start: { dateTime: evento.dataInicio, timeZone: evento.fusoHorario }, end: { dateTime: evento.dataFim, timeZone: evento.fusoHorario } }, { timeout: 10000, headers: { Authorization: `Bearer ${tokens.accessToken}` } });
+    return { externalEventId: resposta.data.id };
+  }
   disponivel() { return Boolean(ambiente.outlook.clientId && ambiente.outlook.clientSecret); }
   urlAutorizacao(estado) {
     if (!this.disponivel()) return null;

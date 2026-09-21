@@ -17,6 +17,7 @@ class ServicoLembretes {
     const lembrete = await this.repositorio.buscarLembretePorId?.(lembreteId) || null;
     if (!lembrete) return { ignorado: true, motivo: 'lembrete_nao_encontrado' };
     if (lembrete.status !== 'agendado') return { ignorado: true, motivo: 'lembrete_ja_processado' };
+    if (new Date(lembrete.agendadoPara) > new Date()) return { ignorado: true, motivo: 'lembrete_reagendado' };
     const tarefa = lembrete.tarefa || await this.repositorio.buscarTarefa(lembrete.usuarioId, lembrete.tarefaId);
     if (!tarefa || tarefa.status !== 'pendente') {
       await this.repositorio.atualizarLembrete(lembrete.usuarioId, lembrete.id, { status: 'cancelado' });
@@ -24,7 +25,8 @@ class ServicoLembretes {
     }
     const usuario = await this.repositorio.buscarUsuarioPorId(lembrete.usuarioId);
     try {
-      await this.servicoWhatsapp.enviarResposta(usuario.telefone, `🔔 Lembrete acadêmico\n\n${tarefa.titulo} vence em breve.\n\nAinda não marcou essa tarefa como concluída.`);
+      const prazo = new Date(tarefa.dataEntrega).toLocaleDateString('pt-BR', { timeZone: usuario.fusoHorario || 'America/Sao_Paulo' });
+      await this.servicoWhatsapp.enviarResposta(usuario.telefone, `🔔 ${tarefa.titulo} — ${tarefa.materia || 'atividade'} — entrega ${prazo}.\nQuando terminar, me avisa por aqui!`);
       await this.repositorio.atualizarLembrete(lembrete.usuarioId, lembrete.id, { status: 'enviado', tentativas: (lembrete.tentativas || 0) + 1, enviadoEm: new Date() });
       return { enviado: true };
     } catch (erro) {

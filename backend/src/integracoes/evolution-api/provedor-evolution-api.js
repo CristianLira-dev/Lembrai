@@ -1,10 +1,7 @@
 const axios = require('axios');
 const ambiente = require('../../configuracao/ambiente');
 const logger = require('../../configuracao/logger');
-
-function normalizarTelefone(valor = '') {
-  return String(valor).replace(/@s\.whatsapp\.net|@g\.us|\D/g, '');
-}
+const { normalizarTelefone } = require('../../utilitarios/telefone');
 
 function extrairTextoMensagem(dados = {}) {
   const mensagem = dados.message || {};

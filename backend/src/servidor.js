@@ -52,7 +52,7 @@ if (require.main === module) {
       await construida.servicos.servicoWhatsapp.configurarWebhook(urlWebhook);
       logger.info({ urlWebhook }, 'webhook da Evolution API configurado');
     } catch (erro) {
-      logger.error({ erro, urlWebhook }, 'não foi possível configurar o webhook da Evolution API');
+      logger.error({ erro: erro.message, codigo: erro.code, urlWebhook }, 'não foi possível configurar o webhook da Evolution API');
     }
   });
 }

@@ -1,11 +1,12 @@
 const { z } = require('zod');
+const { normalizarTelefone } = require('../utilitarios/telefone');
 
 const esquemaTelefone = z
   .string()
   .trim()
   .min(8)
   .max(30)
-  .transform((valor) => valor.replace(/\D/g, ''))
+  .transform(normalizarTelefone)
   .refine(
     (valor) => valor.length >= 8 && valor.length <= 15,
     'Informe um número de WhatsApp válido'

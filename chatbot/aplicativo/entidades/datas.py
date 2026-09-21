@@ -31,21 +31,23 @@ def extrair_horario(texto: str) -> tuple[str | None, str | None]:
     for padrao in padroes:
         encontrado = re.search(padrao, texto.lower())
         if encontrado:
-            hora = max(0, min(23, int(encontrado.group(1))))
+            hora = int(encontrado.group(1))
             minuto = int(encontrado.group(2) or 0)
+            if hora > 23 or minuto > 59:
+                return None, encontrado.group(0)
             return f"{hora:02d}:{minuto:02d}", encontrado.group(0)
     return None, None
 
 
-def extrair_data(texto: str, fuso: str) -> tuple[date | None, str | None]:
-    agora = agora_no_fuso(fuso)
+def extrair_data(texto: str, fuso: str, referencia: datetime | None = None) -> tuple[date | None, str | None]:
+    agora = (referencia.replace(tzinfo=ZoneInfo(fuso)) if referencia and referencia.tzinfo is None else referencia.astimezone(ZoneInfo(fuso))) if referencia else agora_no_fuso(fuso)
     baixo = texto.lower()
     if "hoje" in baixo:
         return agora.date(), "hoje"
-    if "amanhã" in baixo or "amanha" in baixo:
-        return agora.date() + timedelta(days=1), "amanhã"
     if "depois de amanhã" in baixo or "depois de amanha" in baixo:
         return agora.date() + timedelta(days=2), "depois de amanhã"
+    if "amanhã" in baixo or "amanha" in baixo:
+        return agora.date() + timedelta(days=1), "amanhã"
 
     correspondencia = re.search(r"\b(?:dia\s*)?(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?\b", baixo)
     if correspondencia:
@@ -74,6 +76,8 @@ def extrair_data(texto: str, fuso: str) -> tuple[date | None, str | None]:
     for nome, indice in DIAS.items():
         if re.search(rf"\b{re.escape(nome)}(?:-feira)?\b", baixo):
             delta = (indice - agora.weekday()) % 7
+            if "semana que vem" in baixo:
+                delta = 7 - agora.weekday() + indice
             if delta == 0 and ("próxima" in baixo or "proxima" in baixo): delta = 7
             return agora.date() + timedelta(days=delta), nome
 

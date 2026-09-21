@@ -51,6 +51,7 @@ class ServicoCalendarios {
   }
 
   async criarEventoParaTarefa(usuarioId, tarefa) {
+    if ((await this.repositorio.listarEventosTarefa(usuarioId, tarefa.id)).length) return this.atualizarEventoParaTarefa(usuarioId, tarefa);
     const conexoes = await this.repositorio.listarConexoes(usuarioId);
     if (!conexoes.length) return { sincronizado: false, motivo: 'nenhum_calendario_conectado' };
     const conexao = conexoes.find((item) => item.status === 'conectado');
@@ -61,6 +62,25 @@ class ServicoCalendarios {
     const evento = await adaptador.criarEvento({ titulo: tarefa.titulo, descricao: tarefa.descricao, dataInicio: inicio.toISOString(), dataFim: fim.toISOString(), fusoHorario: 'America/Sao_Paulo' }, { accessToken: descriptografar(conexao.tokenAcessoCriptografado) });
     await this.repositorio.criarEventoCalendario({ usuarioId, tarefaId: tarefa.id, provedor: conexao.provedor, identificadorEventoExterno: evento.externalEventId, identificadorCalendario: evento.calendarId, dataInicio: inicio, dataFim: fim, fusoHorario: 'America/Sao_Paulo', statusSincronizacao: 'sincronizado', ultimoSincronismoEm: new Date() });
     return { sincronizado: true, provedor: conexao.provedor, evento };
+  }
+
+  async atualizarEventoParaTarefa(usuarioId, tarefa) {
+    const eventos = await this.repositorio.listarEventosTarefa(usuarioId, tarefa.id);
+    if (!eventos.length) return { sincronizado: false, motivo: 'nenhum_evento_externo' };
+    const usuario = await this.repositorio.buscarUsuarioPorId(usuarioId);
+    for (const evento of eventos) {
+      const conexao = await this.repositorio.buscarConexao(usuarioId, evento.provedor);
+      if (!conexao || conexao.status !== 'conectado') continue;
+      const inicio = new Date(tarefa.dataEntrega);
+      const fim = new Date(inicio.getTime() + (tarefa.duracao || 60) * 60000);
+      await obterProvedor(evento.provedor).atualizarEvento(evento.identificadorEventoExterno, {
+        titulo: (tarefa.status === 'concluida' ? '[Concluída] ' : '') + tarefa.titulo,
+        descricao: tarefa.descricao || '', dataInicio: inicio.toISOString(), dataFim: fim.toISOString(),
+        fusoHorario: usuario.fusoHorario || 'America/Sao_Paulo'
+      }, { accessToken: descriptografar(conexao.tokenAcessoCriptografado) }, evento.identificadorCalendario);
+      await this.repositorio.atualizarEventoCalendario(usuarioId, evento.id, { dataInicio: inicio.toISOString(), dataFim: fim.toISOString(), statusSincronizacao: 'sincronizado', ultimoSincronismoEm: new Date().toISOString() });
+    }
+    return { sincronizado: true };
   }
 }
 

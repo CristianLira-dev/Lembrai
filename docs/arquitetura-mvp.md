@@ -43,7 +43,7 @@ O frontend nunca acessa PostgreSQL/Supabase, Redis, Evolution API, tokens OAuth 
 |---|---|---|---:|
 | `frontend` | React, Vite, JavaScript, React Router, Fetch API | Painel, autenticação e consumo da API | 5173 |
 | `backend` | Node.js, Express, Supabase JS, Zod, Pino, BullMQ | API REST, autenticação, negócio, webhooks e integrações | 3000 |
-| `chatbot` | Python, FastAPI, Pydantic | Interpretação de mensagens e geração de resposta estruturada | 8000 |
+| `chatbot` | Python, FastAPI, Pydantic, OpenRouter | Interpretação de mensagens e geração de resposta estruturada | 8000 |
 | Supabase | Auth, PostgreSQL e Data API | Identidade e persistência relacional multiusuário | externo |
 | `redis` | Redis 7 | Filas, idempotência e armazenamento transitório | 6379 |
 | Evolution API | Serviço externo ou container separado | WhatsApp, envio e webhooks | externo |
@@ -130,7 +130,7 @@ A estratégia de conflito utiliza `externalEventId`, `updatedAt`, `lastSyncedAt`
 
 ## 6. Autenticação e multi-tenancy
 
-O cadastro envia a senha por HTTPS ao Supabase Auth. O Supabase emite e renova o JWT; o backend valida o Bearer token com `auth.getUser` e protege as rotas de negócio. As consultas sempre filtram por `usuarioId`; o telefone do WhatsApp é usado somente para localizar ou criar o usuário associado à conversa.
+O cadastro envia a senha por HTTPS ao Supabase Auth. O Supabase emite e renova o JWT; o backend valida o Bearer token com `auth.getUser` e protege as rotas de negócio. As consultas sempre filtram por `usuarioId`; o telefone do WhatsApp é usado somente para localizar uma conta existente. O assistente nunca cria um perfil provisório pelo WhatsApp.
 
 O SDK do Supabase mantém a sessão no navegador, renova o access token e remove a sessão local no logout. O frontend não recebe tokens OAuth de calendários nem a chave secreta da Data API.
 
@@ -144,9 +144,9 @@ O tratamento cobre eventos duplicados, mensagens fora de ordem, falhas e timeout
 
 ## 8. Comunicação Node.js ↔ Python
 
-O backend chama `POST /api/v1/assistente/processar` por HTTP interno com `x-servico-token`. O payload inclui usuário, conversa, mensagem e contexto com tarefa pendente e tarefas recentes. O chatbot não lê o banco nem executa ações. A validação Pydantic retorna intenção, confiança, campos ausentes, tarefa normalizada e resposta em português.
+O backend chama `POST /api/v1/assistente/processar` por HTTP interno com `x-servico-token`. O payload inclui a mensagem e somente o contexto acadêmico necessário. Telefone, e-mail, tokens e identificadores internos não são enviados ao provedor de IA. O chatbot não lê o banco nem executa ações: ele usa saída estruturada para propor intenção e entidades, e o Node.js valida, confirma e executa cada operação.
 
-As intenções do MVP são `create_task`, `list_today`, `list_week`, `next_exam`, `list_overdue`, `complete_task`, `delete_task`, `confirm`, `cancel` e `unknown`. Datas relativas são convertidas para ISO usando o fuso enviado pelo backend; mensagens ambíguas não executam alterações.
+As intenções cobrem cadastro e consulta de matérias, cadastro, edição e conclusão de atividades, consulta de pendências e alteração do horário dos lembretes. Toda escrita exige confirmação explícita persistida. Datas relativas são convertidas usando a data e o fuso enviados pelo backend; mensagens ambíguas não executam alterações. O modelo fica limitado a `openrouter/free` ou identificadores `:free`, com interpretador local como contingência.
 
 ## 9. Calendários
 

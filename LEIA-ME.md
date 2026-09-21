@@ -88,4 +88,24 @@ Para a Evolution API, configure `EVOLUTION_API_URL`, `EVOLUTION_API_CHAVE`, `EVO
 
 Para Google Calendar ou Outlook, configure os clientes OAuth correspondentes. Os tokens ficam no backend e não são enviados ao navegador.
 
+### Respostas da Lembraí com IA
+
+No serviço **chatbot** do Render, configure:
+
+```dotenv
+OPENROUTER_API_KEY=chave_criada_no_openrouter
+OPENROUTER_MODEL=openrouter/free
+TOKEN_SERVICO_INTERNO=um_segredo_longo_e_aleatorio
+```
+
+No serviço **backend**, use o mesmo `TOKEN_SERVICO_INTERNO` e configure:
+
+```dotenv
+URL_CHATBOT=https://lembrai-chat-bot.onrender.com
+```
+
+O chatbot aceita apenas o roteador gratuito `openrouter/free` ou modelos cujo identificador termina em `:free`. Se o provedor de IA estiver temporariamente indisponível, o interpretador local assume o atendimento para manter os fluxos básicos funcionando.
+
+O fluxo do WhatsApp identifica a conta pelo telefone, interpreta a mensagem, pede confirmação antes de qualquer alteração e só então grava no Supabase, agenda lembretes e sincroniza os calendários conectados. O chatbot recebe apenas o contexto acadêmico necessário; telefone, e-mail, tokens e identificadores internos não são enviados à OpenRouter.
+
 A arquitetura completa está em [`docs/arquitetura-mvp.md`](docs/arquitetura-mvp.md).

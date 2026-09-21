@@ -1,23 +1,20 @@
 const { filas } = require('../filas/filas');
+const { dataNoFuso, dataHorarioNoFuso, somarDias } = require('../utilitarios/datas');
 
-const mapaTipo = { exam: 'prova', assignment: 'trabalho', task: 'tarefa', class: 'aula', appointment: 'compromisso', prova: 'prova', trabalho: 'trabalho', tarefa: 'tarefa' };
+const mapaTipo = { exam: 'prova', assignment: 'trabalho', task: 'tarefa', class: 'aula', appointment: 'compromisso', other: 'outro', prova: 'prova', trabalho: 'trabalho', tarefa: 'tarefa' };
 const mapaPrioridade = { low: 'baixa', medium: 'media', high: 'alta', baixa: 'baixa', media: 'media', alta: 'alta' };
-const mapaUnidade = { minute: 'minuto', minutes: 'minuto', hour: 'hora', hours: 'hora', day: 'dia', days: 'dia' };
 
 function paraDataEntrega(tarefa) {
+  if (tarefa.dueDate) return dataHorarioNoFuso(tarefa.dueDate, tarefa.dueTime || '23:59', tarefa.timezone);
   if (tarefa.dueDateTime) return new Date(tarefa.dueDateTime);
-  const data = tarefa.dueDate || tarefa.dataEntrega;
-  if (!data) return null;
-  const horario = tarefa.dueTime || tarefa.horarioEntrega || '23:59';
-  const dataTexto = String(data).length === 10 ? `${data}T${horario}:00` : data;
-  return new Date(dataTexto);
+  return tarefa.dataEntrega ? new Date(tarefa.dataEntrega) : null;
 }
 
 function calcularAgendamento(dataEntrega, lembrete = { amount: 1, unit: 'day' }) {
   const quantidade = Number(lembrete.amount || lembrete.quantidade || 1);
-  const unidade = mapaUnidade[lembrete.unit || lembrete.unidade] || 'dia';
-  const milissegundos = unidade === 'minuto' ? quantidade * 60 * 1000 : unidade === 'hora' ? quantidade * 60 * 60 * 1000 : quantidade * 24 * 60 * 60 * 1000;
-  return new Date(new Date(dataEntrega).getTime() - milissegundos);
+  const unidade = lembrete.unit || lembrete.unidade || 'day';
+  const unidadeMs = /^(minute|minuto)/.test(unidade) ? 60000 : /^(hour|hora)/.test(unidade) ? 3600000 : 86400000;
+  return new Date(new Date(dataEntrega).getTime() - quantidade * unidadeMs);
 }
 
 class ServicoTarefas {
@@ -25,30 +22,100 @@ class ServicoTarefas {
     this.repositorio = repositorio;
     this.servicoCalendarios = servicoCalendarios;
   }
-
   async listar(usuarioId, filtros) { return this.repositorio.listarTarefas(usuarioId, filtros); }
-  async obter(usuarioId, id) { const tarefa = await this.repositorio.buscarTarefa(usuarioId, id); if (!tarefa) { const erro = new Error('Tarefa não encontrada'); erro.statusCode = 404; throw erro; } return tarefa; }
+  async obter(usuarioId, id) { const t = await this.repositorio.buscarTarefa(usuarioId, id); if (!t) { const e = new Error('Tarefa não encontrada'); e.statusCode = 404; throw e; } return t; }
 
-  async criar(usuarioId, dados, opcoes = {}) {
-    const tarefa = await this.repositorio.criarTarefa({ usuarioId, titulo: dados.titulo || dados.title || 'Tarefa acadêmica', descricao: dados.descricao || dados.notes || null, materia: dados.materia || dados.subject || null, tipo: mapaTipo[dados.tipo] || mapaTipo[dados.type] || dados.tipo || 'tarefa', dataEntrega: paraDataEntrega(dados), horarioEntrega: dados.dueTime || dados.horarioEntrega || null, duracao: dados.duracao || dados.duration || null, prioridade: mapaPrioridade[dados.prioridade || dados.priority] || 'media' });
-    const lembretes = dados.reminders || dados.lembretes || [{ amount: 1, unit: 'day' }];
-    await Promise.all(lembretes.map(async (lembrete) => {
-      const agendadoPara = calcularAgendamento(tarefa.dataEntrega, lembrete);
-      if (agendadoPara <= new Date() && !opcoes.agendarAtrasado) return null;
-      const registro = await this.repositorio.criarLembrete({ tarefaId: tarefa.id, usuarioId, agendadoPara, tipo: `${lembrete.amount || lembrete.quantidade || 1}_${lembrete.unit || lembrete.unidade || 'day'}` });
-      return filas.lembretes.add('enviar-lembrete', { lembreteId: registro.id }, { delay: Math.max(0, agendadoPara.getTime() - Date.now()) });
-    }));
-    let calendario = { sincronizado: false, motivo: 'não solicitado' };
-    if (opcoes.sincronizarCalendario !== false) {
-      try { calendario = await this.servicoCalendarios.criarEventoParaTarefa(usuarioId, tarefa); } catch (erro) { calendario = { sincronizado: false, motivo: erro.message }; }
-    }
-    return { tarefa, calendario };
+  async cancelarLembretes(usuarioId, tarefaId) {
+    const antigos = (await this.repositorio.listarLembretes(usuarioId)).filter((l) => l.tarefaId === tarefaId && l.status === 'agendado');
+    for (const l of antigos) await this.repositorio.atualizarLembrete(usuarioId, l.id, { status: 'cancelado' });
   }
 
-  async atualizar(usuarioId, id, dados) { return this.repositorio.atualizarTarefa(usuarioId, id, dados); }
+  async agendarPadrao(usuarioId, tarefa, usuario) {
+    const fuso = usuario.fusoHorario || 'America/Sao_Paulo';
+    const dia = dataNoFuso(tarefa.dataEntrega, fuso);
+    const hora = usuario.horarioLembretes || '07:27';
+    let agendadoPara = dataHorarioNoFuso(somarDias(dia, -1), hora, fuso);
+    if (agendadoPara <= new Date()) agendadoPara = dataHorarioNoFuso(dia, hora, fuso);
+    if (agendadoPara <= new Date() || agendadoPara >= new Date(tarefa.dataEntrega)) return false;
+    const registro = await this.repositorio.criarLembrete({ tarefaId: tarefa.id, usuarioId, agendadoPara, tipo: 'padrao_diario' });
+    await filas.lembretes.add('enviar-lembrete', { lembreteId: registro.id }, { delay: Math.max(0, agendadoPara - Date.now()) });
+    return true;
+  }
+
+  async criar(usuarioId, dados, opcoes = {}) {
+    const usuario = await this.repositorio.buscarUsuarioPorId(usuarioId);
+    const dataEntrega = paraDataEntrega({ ...dados, timezone: usuario.fusoHorario });
+    if (!dataEntrega || Number.isNaN(dataEntrega.getTime())) throw new Error('Data inválida');
+    // Id estável da ação impede duplicação se a resposta falhar depois da gravação.
+    const existente = opcoes.idTarefa ? await this.repositorio.buscarTarefa(usuarioId, opcoes.idTarefa) : null;
+    const tarefa = existente || await this.repositorio.criarTarefa({
+      ...(opcoes.idTarefa ? { id: opcoes.idTarefa } : {}), usuarioId,
+      titulo: dados.titulo || dados.title, descricao: dados.descricao || dados.notes || null,
+      materia: dados.materia || dados.subject || null,
+      tipo: mapaTipo[dados.tipo] || mapaTipo[dados.type] || dados.tipo || 'tarefa',
+      dataEntrega, horarioEntrega: dados.dueTime || dados.horarioEntrega || null,
+      duracao: dados.duracao || dados.duration || null, prioridade: mapaPrioridade[dados.prioridade || dados.priority] || 'media'
+    });
+    let lembreteAgendado = false;
+    const avisos = [];
+    try {
+      if (tarefa.materia) await this.repositorio.criarMateria(usuarioId, tarefa.materia);
+      await this.cancelarLembretes(usuarioId, tarefa.id);
+      const lembretes = opcoes.horarioPadrao ? null : (dados.reminders || dados.lembretes);
+      if (!lembretes) lembreteAgendado = await this.agendarPadrao(usuarioId, tarefa, usuario);
+      else for (const lembrete of lembretes) {
+        const agendadoPara = calcularAgendamento(tarefa.dataEntrega, lembrete);
+        if (agendadoPara <= new Date() && !opcoes.agendarAtrasado) continue;
+        const r = await this.repositorio.criarLembrete({ tarefaId: tarefa.id, usuarioId, agendadoPara, tipo: String(lembrete.amount || 1) + '_' + (lembrete.unit || 'day') });
+        await filas.lembretes.add('enviar-lembrete', { lembreteId: r.id }, { delay: Math.max(0, agendadoPara - Date.now()) });
+        lembreteAgendado = true;
+      }
+    } catch { avisos.push('Não consegui agendar os lembretes.'); }
+    let calendario = { sincronizado: false, motivo: 'não solicitado' };
+    if (opcoes.sincronizarCalendario !== false) {
+      try { calendario = await this.servicoCalendarios.criarEventoParaTarefa(usuarioId, tarefa); }
+      catch { calendario = { sincronizado: false, motivo: 'falha' }; avisos.push('O calendário externo não sincronizou.'); }
+    }
+    return { tarefa, calendario, lembreteAgendado, avisos };
+  }
+
+  async atualizar(usuarioId, id, dados) {
+    const anterior = await this.obter(usuarioId, id);
+    const tarefa = await this.repositorio.atualizarTarefa(usuarioId, id, dados);
+    const avisos = [];
+    try {
+      if (dados.materia) await this.repositorio.criarMateria(usuarioId, dados.materia);
+      if (dados.dataEntrega && new Date(dados.dataEntrega).getTime() !== new Date(anterior.dataEntrega).getTime()) {
+        await this.cancelarLembretes(usuarioId, id);
+        if (tarefa.status === 'pendente') await this.agendarPadrao(usuarioId, tarefa, await this.repositorio.buscarUsuarioPorId(usuarioId));
+      }
+    } catch { avisos.push('Não consegui atualizar os lembretes.'); }
+    try { await this.servicoCalendarios.atualizarEventoParaTarefa(usuarioId, tarefa); }
+    catch { avisos.push('O calendário externo não sincronizou.'); }
+    return { ...tarefa, avisos };
+  }
+
   async excluir(usuarioId, id) { return this.repositorio.excluirTarefa(usuarioId, id); }
-  async concluir(usuarioId, id) { return this.repositorio.atualizarTarefa(usuarioId, id, { status: 'concluida' }); }
+  async concluir(usuarioId, id) {
+    await this.obter(usuarioId, id);
+    const tarefa = await this.repositorio.atualizarTarefa(usuarioId, id, { status: 'concluida' });
+    const avisos = [];
+    try { await this.cancelarLembretes(usuarioId, id); } catch { avisos.push('Os lembretes ainda estão sendo atualizados.'); }
+    try { await this.servicoCalendarios.atualizarEventoParaTarefa(usuarioId, tarefa); }
+    catch { avisos.push('O calendário externo não sincronizou.'); }
+    return { ...tarefa, avisos };
+  }
+
+  async alterarHorario(usuarioId, horario) {
+    const usuario = await this.repositorio.atualizarUsuario(usuarioId, { horarioLembretes: horario, preferenciaLembretesPerguntada: true });
+    const tarefas = await this.repositorio.listarTarefas(usuarioId, { status: 'pendente' });
+    for (const tarefa of tarefas) {
+      const lembretes = (await this.repositorio.listarLembretes(usuarioId)).filter((l) => l.tarefaId === tarefa.id && l.tipo === 'padrao_diario' && l.status === 'agendado');
+      for (const l of lembretes) await this.repositorio.atualizarLembrete(usuarioId, l.id, { status: 'cancelado' });
+      await this.agendarPadrao(usuarioId, tarefa, usuario);
+    }
+    return usuario;
+  }
   async estatisticas(usuarioId) { return this.repositorio.estatisticas(usuarioId); }
 }
-
 module.exports = { ServicoTarefas, paraDataEntrega, calcularAgendamento };

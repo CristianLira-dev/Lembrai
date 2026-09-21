@@ -2,6 +2,12 @@ const { esquemaWebhookEvolution, validar } = require('../validadores/esquemas');
 const { extrairTextoMensagem, normalizarTelefone } = require('../integracoes/evolution-api/provedor-evolution-api');
 
 function criarControladorWebhook({ repositorio, filaMensagens, servicoAssistente }) {
+  function jidContato(dados, evento) {
+    const principal = evento.key?.remoteJid || '';
+    if (principal.endsWith('@g.us')) return '';
+    if (principal.endsWith('@lid')) return evento.key?.remoteJidAlt || dados.sender || '';
+    return principal || dados.sender || '';
+  }
   return {
     evolution: async (req, res) => {
       const dados = validar(esquemaWebhookEvolution, req.body);
@@ -12,7 +18,7 @@ function criarControladorWebhook({ repositorio, filaMensagens, servicoAssistente
       res.status(202).json({ recebido: true, id: registro.evento.id });
       if (dados.event.toUpperCase().replace('.', '_') === 'MESSAGES_UPSERT' || dados.event.toLowerCase() === 'messages.upsert') {
         const texto = extrairTextoMensagem(evento);
-        const telefone = normalizarTelefone(evento.key?.remoteJid || dados.sender || '');
+        const telefone = normalizarTelefone(jidContato(dados, evento));
         if (!texto || !telefone || evento.key?.fromMe) return;
         const entrada = { telefone, nome: evento.pushName || 'Estudante', texto, identificadorExterno: identificador, recebidoEm: dados.date_time || new Date().toISOString(), evento };
         if (process.env.USAR_FILAS_MEMORIA === 'true') {
@@ -29,7 +35,7 @@ function criarControladorWebhook({ repositorio, filaMensagens, servicoAssistente
     simular: async (req, res) => {
       const dados = validar(esquemaWebhookEvolution, req.body);
       const texto = extrairTextoMensagem(dados.data);
-      const telefone = normalizarTelefone(dados.data?.key?.remoteJid || dados.sender || '5511999999999');
+      const telefone = normalizarTelefone(jidContato(dados, dados.data) || '5511999999999');
       const resultado = await servicoAssistente.processarEntrada({ telefone, nome: dados.data?.pushName || 'Estudante', texto, identificadorExterno: dados.data?.key?.id || `simulado-${Date.now()}` });
       return res.json({ ok: true, resposta: resultado.resposta, interpretacao: resultado.interpretacao });
     }

@@ -10,5 +10,6 @@ coverage/
 .env.*
 !.env.example
 .prisma/
+supabase/.temp/
 
 .env

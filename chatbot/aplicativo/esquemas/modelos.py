@@ -22,6 +22,8 @@ class MensagemEntrada(BaseModel):
 class ContextoEntrada(BaseModel):
     pendingAction: dict[str, Any] | None = None
     recentTasks: list[dict[str, Any]] = Field(default_factory=list)
+    subjects: list[str] = Field(default_factory=list)
+    reminderTime: str = "07:27"
 
 
 class RequisicaoProcessamento(BaseModel):
@@ -51,9 +53,13 @@ class TarefaInterpretada(BaseModel):
 
 
 class RespostaProcessamento(BaseModel):
-    intent: Literal["create_task", "list_today", "list_week", "next_exam", "list_overdue", "complete_task", "delete_task", "confirm", "cancel", "unknown"]
+    intent: Literal["create_task", "create_subject", "edit_task", "list_pending", "list_today", "list_week", "next_exam", "list_overdue", "list_subjects", "get_reminder_time", "set_reminder_time", "complete_task", "confirm", "cancel", "unknown"]
     confidence: float = Field(ge=0, le=1)
     requiresConfirmation: bool = False
     missingFields: list[str] = Field(default_factory=list)
     task: TarefaInterpretada | None = None
+    reference: str | None = None
+    subject: str | None = None
+    reminderTime: str | None = None
+    generation: dict[str, Any] | None = None
     response: str
