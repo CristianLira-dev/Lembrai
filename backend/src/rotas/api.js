@@ -7,6 +7,7 @@ const { criarControladorLembretes } = require('../controladores/lembretes-contro
 const { criarControladorWebhook } = require('../controladores/webhook-controlador');
 const { criarControladorPainel } = require('../controladores/painel-controlador');
 const { diagnosticoConsultaEvolution } = require('../consulta-mensagens-evolution');
+const { codigoSeguroErroChatbot } = require('../servicos/servico-chatbot');
 
 function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCalendarios, filaMensagens, servicoAssistente, servicoAutenticacao = criarServicoAutenticacao(repositorio) }) {
   const rotas = express.Router();
@@ -52,6 +53,19 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
     servico: 'evolution-polling',
     ...diagnosticoConsultaEvolution
   }));
+  rotas.get('/saude/chatbot', async (req, res) => {
+    try {
+      const resultado = await servicoAssistente.servicoChatbot.diagnosticar();
+      return res.json({ status: 'ok', servico: 'chatbot', conectado: resultado?.status === 'ok' });
+    } catch (erro) {
+      return res.status(503).json({
+        status: 'degradado',
+        servico: 'chatbot',
+        conectado: false,
+        codigoErro: codigoSeguroErroChatbot(erro)
+      });
+    }
+  });
   rotas.get('/saude/banco', async (req, res, next) => {
     try {
       await repositorio.verificarConexao();

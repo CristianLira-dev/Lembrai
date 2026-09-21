@@ -1,6 +1,6 @@
 const crypto = require('node:crypto');
 const { z } = require('zod');
-const { ServicoChatbot } = require('./servico-chatbot');
+const { ServicoChatbot, codigoSeguroErroChatbot } = require('./servico-chatbot');
 const { dataNoFuso, dataValida, horarioValido, dataHorarioNoFuso, somarDias, formatarData } = require('../utilitarios/datas');
 const { normalizarTelefone } = require('../utilitarios/telefone');
 
@@ -257,7 +257,14 @@ class ServicoAssistente {
             message: { id: mensagem.id, content: texto, receivedAt: new Date(recebidoEm).toISOString() },
             context: { pendingAction: pendente, recentTasks: tarefas.slice(0, 50).map((t) => ({ titulo: t.titulo, materia: t.materia, dataEntrega: t.dataEntrega, horarioEntrega: t.horarioEntrega, status: t.status })), subjects: materias.map((m) => m.nome), reminderTime: usuario.horarioLembretes || '07:27' }
           });
-        } catch { interpretacao = textoFallback(texto); }
+        } catch (erro) {
+          interpretacao = textoFallback(texto);
+          interpretacao.generation = {
+            provider: 'chatbot',
+            status: 'fallback',
+            errorCode: codigoSeguroErroChatbot(erro)
+          };
+        }
         const proposta = propostaSchema.safeParse(interpretacao);
         if (interpretacao.intent === 'unavailable') resposta = FALHA;
         else if (!proposta.success || proposta.data.intent === 'unknown') resposta = FORA_ESCOPO;
