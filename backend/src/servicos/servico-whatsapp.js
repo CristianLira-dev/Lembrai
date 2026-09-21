@@ -12,6 +12,10 @@ class ServicoWhatsapp {
   async configurarWebhook(url) {
     return this.provedor.configurarWebhook(url);
   }
+
+  async buscarMensagensRecentes(limite) {
+    return this.provedor.buscarMensagensRecentes(limite);
+  }
 }
 
 module.exports = { ServicoWhatsapp };

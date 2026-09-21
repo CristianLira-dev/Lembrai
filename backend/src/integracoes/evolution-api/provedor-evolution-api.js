@@ -42,6 +42,16 @@ class ProvedorEvolutionApi {
     });
     return resposta.data;
   }
+
+  async buscarMensagensRecentes(limite = 50) {
+    if (this.simulado) return [];
+    const resposta = await this.cliente.post(`/chat/findMessages/${ambiente.evolutionInstancia}`, {
+      where: {},
+      page: 1,
+      offset: limite
+    });
+    return resposta.data?.messages?.records || [];
+  }
 }
 
 module.exports = { ProvedorEvolutionApi, normalizarTelefone, extrairTextoMensagem };
