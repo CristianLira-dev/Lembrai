@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const { RepositorioMemoria } = require('../src/repositorios/repositorio-dados');
 const { ServicoCalendarios } = require('../src/servicos/servico-calendarios');
 const { ServicoTarefas, calcularAgendamento } = require('../src/servicos/servico-tarefas');
+const { ServicoLembretes } = require('../src/servicos/servico-lembretes');
 const { ServicoAssistente, SEM_CONTA, FORA_ESCOPO } = require('../src/servicos/servico-assistente');
 const { normalizarTelefone } = require('../src/utilitarios/telefone');
 
@@ -18,7 +19,7 @@ function criarCenario(respostas = []) {
   let indice = 0;
   const chatbot = { chamadas: 0, async processar() { this.chamadas += 1; return respostas[Math.min(indice++, respostas.length - 1)]; } };
   const assistente = new ServicoAssistente({ repositorio, servicoTarefas: tarefas, servicoWhatsapp: whatsapp, servicoChatbot: chatbot });
-  return { repositorio, calendarios, tarefas, assistente, mensagens, chatbot };
+  return { repositorio, calendarios, tarefas, assistente, mensagens, whatsapp, chatbot };
 }
 
 async function criarUsuario(cenario, telefone = '5511999999999') {
@@ -35,6 +36,35 @@ const atividade = {
 test('calcula lembrete um dia antes', () => {
   const agendamento = calcularAgendamento('2027-08-28T22:00:00.000Z', { amount: 1, unit: 'day' });
   assert.equal(agendamento.toISOString(), '2027-08-27T22:00:00.000Z');
+});
+
+test('envia um resumo detalhado a cada dois dias para cada usuário com pendências', async () => {
+  const cenario = criarCenario();
+  const usuario = await criarUsuario(cenario);
+  await cenario.repositorio.criarTarefa({
+    usuarioId: usuario.id, titulo: 'Trabalho de Redes', materia: 'Sistemas Operacionais',
+    dataEntrega: new Date('2027-10-20T22:00:00.000Z')
+  });
+  await cenario.repositorio.criarTarefa({
+    usuarioId: usuario.id, titulo: 'Prova de Banco de Dados', materia: 'Banco de Dados',
+    dataEntrega: new Date('2027-10-22T17:00:00.000Z')
+  });
+  const lembretes = new ServicoLembretes({ repositorio: cenario.repositorio, servicoWhatsapp: cenario.whatsapp });
+  const agora = new Date('2027-10-18T13:00:00.000Z');
+  await cenario.repositorio.atualizarUsuario(usuario.id, { proximoResumoPendenciasEm: new Date('2027-10-18T12:59:00.000Z') });
+
+  const primeiro = await lembretes.processarResumosPendentes(agora);
+  assert.deepEqual(primeiro, { agendados: 0, enviados: 1, falhos: 0 });
+  assert.match(cenario.mensagens[0].texto, /Trabalho de Redes/);
+  assert.match(cenario.mensagens[0].texto, /Prova de Banco de Dados/);
+  assert.match(cenario.mensagens[0].texto, /20\/10\/2027/);
+  assert.match(cenario.mensagens[0].texto, /22\/10\/2027/);
+
+  const antesDeDoisDias = await lembretes.processarResumosPendentes(new Date('2027-10-20T10:26:00.000Z'));
+  assert.equal(antesDeDoisDias.enviados, 0);
+  const segundo = await lembretes.processarResumosPendentes(new Date('2027-10-20T10:27:00.000Z'));
+  assert.equal(segundo.enviados, 1);
+  assert.equal(cenario.mensagens.length, 2);
 });
 
 test('normaliza cadastro brasileiro para o formato entregue pela Evolution', () => {
@@ -63,7 +93,8 @@ test('criação exige confirmação, agenda lembrete e pergunta o horário uma v
   assert.equal(criadas.length, 1);
   assert.equal(criadas[0].materia, 'Sistemas Operacionais');
   assert.match(confirmacao.resposta, /Os lembretes chegam às 07:27/);
-  assert.equal((await cenario.repositorio.listarLembretes(usuario.id)).length, 1);
+  assert.equal((await cenario.repositorio.listarLembretes(usuario.id)).length, 0);
+  assert.ok((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm);
 
   await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'não', identificadorExterno: 'm-3' });
   assert.match(cenario.mensagens.at(-1).texto, /mantive o horário/);
@@ -79,6 +110,7 @@ test('conclusão só é executada depois de confirmação explícita', async () 
   assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'pendente');
   await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'confirmo', identificadorExterno: 'c-2' });
   assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'concluida');
+  assert.equal((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm, null);
 });
 
 test('edição altera a atividade somente depois da confirmação', async () => {

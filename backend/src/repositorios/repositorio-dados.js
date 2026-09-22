@@ -33,6 +33,9 @@ class RepositorioMemoria {
   async buscarUsuarioPorEmail(email) { return this.usuarios.find((item) => item.email === email) || null; }
   async buscarUsuarioPorId(id) { return this.usuarios.find((item) => item.id === id) || null; }
   async buscarUsuarioPorTelefone(telefone) { return this.usuarios.find((item) => item.telefone === telefone) || null; }
+  async listarUsuariosComTarefasPendentes() {
+    return this.usuarios.filter((usuario) => this.tarefas.some((tarefa) => tarefa.usuarioId === usuario.id && tarefa.status === 'pendente'));
+  }
   async atualizarUsuario(id, dados) { const usuario = await this.buscarUsuarioPorId(id); if (!usuario) return null; Object.assign(usuario, dados, { atualizadoEm: new Date() }); return usuario; }
   async listarMaterias(usuarioId) { return this.materias.filter((item) => item.usuarioId === usuarioId); }
   async criarMateria(usuarioId, nome) { const normalizado = nome.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); const existente = this.materias.find((item) => item.usuarioId === usuarioId && item.normalizado === normalizado); if (existente) return existente; const materia = { id: criarId('mat'), usuarioId, nome: nome.trim(), normalizado }; this.materias.push(materia); return materia; }
@@ -174,6 +177,12 @@ class RepositorioSupabase {
   async buscarUsuarioPorEmail(email) { return this.buscarUm('Usuario', { email }); }
   async buscarUsuarioPorId(id) { return this.buscarUm('Usuario', { id }); }
   async buscarUsuarioPorTelefone(telefone) { return this.buscarUm('Usuario', { telefone }); }
+  async listarUsuariosComTarefasPendentes() {
+    const { data } = await this.executar(this.criarCliente().from('Usuario')
+      .select('*, tarefas:Tarefa!inner(id)')
+      .eq('tarefas.status', 'pendente'));
+    return data.map(({ tarefas, ...usuario }) => usuario);
+  }
   async atualizarUsuario(id, dados) { const { data } = await this.executar(this.criarCliente().from('Usuario').update({ ...dados, atualizadoEm: dataIso() }).eq('id', id).select().maybeSingle()); return data; }
   async listarMaterias(usuarioId) { const { data } = await this.executar(this.criarCliente().from('Materia').select('*').eq('usuarioId', usuarioId).order('nome')); return data; }
   async criarMateria(usuarioId, nome) {

@@ -1,3 +1,5 @@
+const { formatarResumoPendencias, proximoResumoBienal, proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
+
 class ServicoLembretes {
   constructor({ repositorio, servicoWhatsapp }) {
     this.repositorio = repositorio;
@@ -12,6 +14,41 @@ class ServicoLembretes {
   }
   async atualizar(usuarioId, id, dados) { return this.repositorio.atualizarLembrete(usuarioId, id, dados); }
   async excluir(usuarioId, id) { return this.repositorio.excluirLembrete(usuarioId, id); }
+
+  async agendarResumoInicial(usuario, agora = new Date()) {
+    if (usuario.proximoResumoPendenciasEm) return new Date(usuario.proximoResumoPendenciasEm);
+    const proximo = proximoResumoInicial(usuario, agora);
+    await this.repositorio.atualizarUsuario(usuario.id, { proximoResumoPendenciasEm: proximo });
+    return proximo;
+  }
+
+  async processarResumosPendentes(agora = new Date()) {
+    const usuarios = await this.repositorio.listarUsuariosComTarefasPendentes();
+    const resultado = { agendados: 0, enviados: 0, falhos: 0 };
+
+    for (const usuario of usuarios) {
+      const proximo = await this.agendarResumoInicial(usuario, agora);
+      if (proximo > agora) {
+        resultado.agendados += 1;
+        continue;
+      }
+
+      try {
+        const tarefas = await this.repositorio.listarTarefas(usuario.id, { status: 'pendente' });
+        if (!tarefas.length) continue;
+        await this.servicoWhatsapp.enviarResposta(usuario.telefone, formatarResumoPendencias(tarefas, usuario));
+        await this.repositorio.atualizarUsuario(usuario.id, {
+          ultimoResumoPendenciasEm: agora,
+          proximoResumoPendenciasEm: proximoResumoBienal(usuario, agora)
+        });
+        resultado.enviados += 1;
+      } catch (erro) {
+        resultado.falhos += 1;
+      }
+    }
+
+    return resultado;
+  }
 
   async processar(lembreteId) {
     const lembrete = await this.repositorio.buscarLembretePorId?.(lembreteId) || null;

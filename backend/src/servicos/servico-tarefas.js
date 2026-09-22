@@ -1,5 +1,6 @@
 const { filas } = require('../filas/filas');
-const { dataNoFuso, dataHorarioNoFuso, somarDias } = require('../utilitarios/datas');
+const { dataHorarioNoFuso } = require('../utilitarios/datas');
+const { proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
 
 const mapaTipo = { exam: 'prova', assignment: 'trabalho', task: 'tarefa', class: 'aula', appointment: 'compromisso', other: 'outro', prova: 'prova', trabalho: 'trabalho', tarefa: 'tarefa' };
 const mapaPrioridade = { low: 'baixa', medium: 'media', high: 'alta', baixa: 'baixa', media: 'media', alta: 'alta' };
@@ -30,15 +31,19 @@ class ServicoTarefas {
     for (const l of antigos) await this.repositorio.atualizarLembrete(usuarioId, l.id, { status: 'cancelado' });
   }
 
+  async limparResumoSemPendencias(usuarioId) {
+    const pendentes = await this.repositorio.listarTarefas(usuarioId, { status: 'pendente' });
+    if (!pendentes.length) {
+      await this.repositorio.atualizarUsuario(usuarioId, { proximoResumoPendenciasEm: null });
+    }
+  }
+
   async agendarPadrao(usuarioId, tarefa, usuario) {
-    const fuso = usuario.fusoHorario || 'America/Sao_Paulo';
-    const dia = dataNoFuso(tarefa.dataEntrega, fuso);
-    const hora = usuario.horarioLembretes || '07:27';
-    let agendadoPara = dataHorarioNoFuso(somarDias(dia, -1), hora, fuso);
-    if (agendadoPara <= new Date()) agendadoPara = dataHorarioNoFuso(dia, hora, fuso);
-    if (agendadoPara <= new Date() || agendadoPara >= new Date(tarefa.dataEntrega)) return false;
-    const registro = await this.repositorio.criarLembrete({ tarefaId: tarefa.id, usuarioId, agendadoPara, tipo: 'padrao_diario' });
-    await filas.lembretes.add('enviar-lembrete', { lembreteId: registro.id }, { delay: Math.max(0, agendadoPara - Date.now()) });
+    if (!usuario.proximoResumoPendenciasEm) {
+      await this.repositorio.atualizarUsuario(usuarioId, {
+        proximoResumoPendenciasEm: proximoResumoInicial(usuario)
+      });
+    }
     return true;
   }
 
@@ -95,19 +100,24 @@ class ServicoTarefas {
     return { ...tarefa, avisos };
   }
 
-  async excluir(usuarioId, id) { return this.repositorio.excluirTarefa(usuarioId, id); }
+  async excluir(usuarioId, id) {
+    const excluida = await this.repositorio.excluirTarefa(usuarioId, id);
+    if (excluida) await this.limparResumoSemPendencias(usuarioId);
+    return excluida;
+  }
   async concluir(usuarioId, id) {
     await this.obter(usuarioId, id);
     const tarefa = await this.repositorio.atualizarTarefa(usuarioId, id, { status: 'concluida' });
     const avisos = [];
     try { await this.cancelarLembretes(usuarioId, id); } catch { avisos.push('Os lembretes ainda estão sendo atualizados.'); }
+    await this.limparResumoSemPendencias(usuarioId);
     try { await this.servicoCalendarios.atualizarEventoParaTarefa(usuarioId, tarefa); }
     catch { avisos.push('O calendário externo não sincronizou.'); }
     return { ...tarefa, avisos };
   }
 
   async alterarHorario(usuarioId, horario) {
-    const usuario = await this.repositorio.atualizarUsuario(usuarioId, { horarioLembretes: horario, preferenciaLembretesPerguntada: true });
+    const usuario = await this.repositorio.atualizarUsuario(usuarioId, { horarioLembretes: horario, preferenciaLembretesPerguntada: true, proximoResumoPendenciasEm: null });
     const tarefas = await this.repositorio.listarTarefas(usuarioId, { status: 'pendente' });
     for (const tarefa of tarefas) {
       const lembretes = (await this.repositorio.listarLembretes(usuarioId)).filter((l) => l.tarefaId === tarefa.id && l.tipo === 'padrao_diario' && l.status === 'agendado');

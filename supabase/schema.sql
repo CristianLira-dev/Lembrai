@@ -26,6 +26,8 @@ CREATE TABLE "Usuario" (
     "fusoHorario" TEXT NOT NULL DEFAULT 'America/Sao_Paulo',
     "horarioLembretes" TEXT NOT NULL DEFAULT '07:27',
     "preferenciaLembretesPerguntada" BOOLEAN NOT NULL DEFAULT false,
+    "proximoResumoPendenciasEm" TIMESTAMP(3),
+    "ultimoResumoPendenciasEm" TIMESTAMP(3),
     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "atualizadoEm" TIMESTAMP(3) NOT NULL,
 
@@ -213,6 +215,9 @@ CREATE INDEX "Lembrete_usuarioId_status_agendadoPara_idx" ON "Lembrete"("usuario
 
 -- CreateIndex
 CREATE INDEX "Lembrete_tarefaId_idx" ON "Lembrete"("tarefaId");
+
+-- CreateIndex
+CREATE INDEX "Usuario_proximoResumoPendenciasEm_idx" ON "Usuario"("proximoResumoPendenciasEm") WHERE "proximoResumoPendenciasEm" IS NOT NULL;
 
 -- CreateIndex
 CREATE INDEX "Conversa_telefone_idx" ON "Conversa"("telefone");
