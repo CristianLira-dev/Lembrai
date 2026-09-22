@@ -141,6 +141,29 @@ test('assunto fora do escopo recebe apenas a resposta definida', async () => {
   assert.equal(resultado.resposta, FORA_ESCOPO);
 });
 
+test('saudações recebem apresentação sem consultar o classificador', async () => {
+  const cenario = criarCenario([{ intent: 'unknown', confidence: 0.99 }]);
+  const usuario = await criarUsuario(cenario);
+  for (const [indice, texto] of ['ola', 'Olá!', 'oi, tudo bem?', 'bom dia', 'Boa noite, Lembraí', 'e aí?'].entries()) {
+    const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto, identificadorExterno: `saudacao-${indice}` });
+    assert.match(resultado.resposta, /Sou a Lembraí.*atividades e prazos/);
+    assert.match(resultado.resposta, /registrar matérias e atividades.*mostrar pendências.*ajustar seus lembretes/);
+  }
+  assert.equal(cenario.chatbot.chamadas, 0);
+});
+
+test('saudação não apaga ação pendente e pedido com saudação continua sendo interpretado', async () => {
+  const cenario = criarCenario([atividade]);
+  const usuario = await criarUsuario(cenario);
+  const pedido = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'Olá, registrar trabalho de Redes', identificadorExterno: 'pedido-com-ola' });
+  assert.match(pedido.resposta, /Vou registrar:.*Confirma/);
+  const saudacao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'oi', identificadorExterno: 'oi-pendente' });
+  assert.match(saudacao.resposta, /Sou a Lembraí/);
+  assert.equal(cenario.chatbot.chamadas, 1);
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'confirma-depois-oi' });
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
+});
+
 test('mesma mensagem externa não é processada duas vezes', async () => {
   const cenario = criarCenario([atividade]);
   const usuario = await criarUsuario(cenario);
