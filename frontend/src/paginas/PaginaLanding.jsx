@@ -108,7 +108,17 @@ export function PaginaLanding() {
     const secao = showcaseRef.current;
     if (!secao) return undefined;
     let frame = 0;
-    const atualizar = () => { frame = 0; const limite = secao.offsetHeight - window.innerHeight; const progresso = Math.max(0, Math.min(1, -secao.getBoundingClientRect().top / Math.max(limite, 1))); setShowcaseStep(Math.min(5, Math.floor(progresso * 6))); };
+    const atualizar = () => {
+      frame = 0;
+      const referencia = window.innerHeight * 0.5;
+      const passos = Array.from(secao.querySelectorAll('.story-step'));
+      const maisProximo = passos.reduce((selecionado, passo, indice) => {
+        const area = passo.getBoundingClientRect();
+        const distancia = Math.abs(area.top + area.height / 2 - referencia);
+        return distancia < selecionado.distancia ? { indice, distancia } : selecionado;
+      }, { indice: 0, distancia: Number.POSITIVE_INFINITY });
+      setShowcaseStep(maisProximo.indice);
+    };
     const aoRolar = () => { if (!frame) frame = window.requestAnimationFrame(atualizar); };
     window.addEventListener('scroll', aoRolar, { passive: true }); atualizar();
     return () => { window.removeEventListener('scroll', aoRolar); if (frame) window.cancelAnimationFrame(frame); };
