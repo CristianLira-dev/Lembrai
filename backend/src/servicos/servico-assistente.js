@@ -7,6 +7,7 @@ const { normalizarTelefone } = require('../utilitarios/telefone');
 
 const SEM_CONTA = 'Ainda não achei uma conta ligada a esse número. Cria a sua por aqui e depois me chama de novo: https://lembrai-chat.vercel.app/cadastro';
 const FORA_ESCOPO = 'Esse assunto eu não consigo ajudar por aqui. Mas se quiser registrar uma atividade, concluir alguma ou ver suas pendências, é comigo!';
+const SAUDACAO = 'Oi! Sou a Lembraí, sua assistente de atividades e prazos. 📚\nPosso registrar matérias e atividades, mostrar pendências, concluir entregas e ajustar seus lembretes. Como posso ajudar?';
 const FALHA = 'Não consegui fazer isso agora. Tenta de novo em instantes?';
 const MUTACOES = ['create_task', 'create_subject', 'complete_task', 'edit_task', 'set_reminder_time'];
 const CONSULTAS = ['list_pending', 'list_today', 'list_week', 'next_exam', 'list_overdue', 'list_subjects', 'get_reminder_time'];
@@ -18,6 +19,10 @@ const propostaSchema = z.object({
 });
 
 function normalizado(s = '') { return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
+function ehSaudacao(texto) {
+  const palavras = normalizado(texto).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  return /^(?:oi+e?|ola+|opa|e ai|bom dia|boa tarde|boa noite|tudo bem|como vai)(?: (?:tudo bem|como vai|lembrai))?$/.test(palavras);
+}
 function telefoneLimpo(s = '') { return normalizarTelefone(s); }
 function limpo(s) { return typeof s === 'string' ? s.replace(/[*_~\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim() : null; }
 function comandoExplicito(texto) {
@@ -252,6 +257,8 @@ class ServicoAssistente {
       } else if (pendente?.stage === 'select' && /^\d+$/.test(texto.trim())) {
         const id = pendente.options[Number(texto.trim()) - 1];
         resposta = id ? await this.preparar(usuario, conversa, { intent: pendente.intent, task: pendente.task }, { ...pendente, targetId: id }) : 'Escolha um dos números da lista.';
+      } else if (ehSaudacao(texto)) {
+        resposta = SAUDACAO;
       } else {
         const [tarefas, materias] = await Promise.all([this.repositorio.listarTarefas(usuario.id, { status: 'pendente' }), this.repositorio.listarMaterias(usuario.id)]);
         try {
