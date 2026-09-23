@@ -117,7 +117,7 @@ def interpretar(req: RequisicaoProcessamento) -> RespostaProcessamento:
         return resultado("list_pending")
     acao = acao_sobre_tarefa(baixo)
     if acao:
-        return resultado(acao[0], reference=acao[1], requiresConfirmation=True)
+        return resultado(acao[0], reference=acao[1], requiresConfirmation=acao[0] == "delete_task")
     edicao = interpretar_edicao(req, texto, baixo, pendente)
     if edicao:
         return edicao

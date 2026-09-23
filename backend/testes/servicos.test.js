@@ -100,15 +100,14 @@ test('criação exige confirmação, agenda lembrete e pergunta o horário uma v
   assert.match(cenario.mensagens.at(-1).texto, /mantive o horário/);
 });
 
-test('conclusão só é executada depois de confirmação explícita', async () => {
+test('conclusão é executada imediatamente quando a atividade é identificada', async () => {
   const respostaConclusao = { intent: 'complete_task', confidence: 0.96, reference: 'Trabalho de Redes' };
   const cenario = criarCenario([respostaConclusao]);
   const usuario = await criarUsuario(cenario);
   const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
 
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'terminei o trabalho de redes', identificadorExterno: 'c-1' });
-  assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'pendente');
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'confirmo', identificadorExterno: 'c-2' });
+  const conclusao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'terminei o trabalho de redes', identificadorExterno: 'c-1' });
+  assert.match(conclusao.resposta, /atividade concluída/);
   assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'concluida');
   assert.equal((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm, null);
 });
@@ -122,10 +121,7 @@ test('fallback local reconhece pedido para marcar atividade como concluída', as
   const proposta = await cenario.assistente.processarEntrada({
     telefone: usuario.telefone, texto: 'marque o trabalho de redes como concluído', identificadorExterno: 'fc-1'
   });
-  assert.match(proposta.resposta, /Vou concluir:.*Trabalho de Redes.*Confirma/);
-  assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'pendente');
-
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode concluir', identificadorExterno: 'fc-2' });
+  assert.match(proposta.resposta, /atividade concluída/);
   assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'concluida');
 });
 

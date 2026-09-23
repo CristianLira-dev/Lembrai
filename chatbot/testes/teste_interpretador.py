@@ -48,7 +48,7 @@ class TesteInterpretador(unittest.TestCase):
         resposta = interpretar(self.requisicao("Marque o trabalho de redes como concluído"))
         self.assertEqual(resposta.intent, "complete_task")
         self.assertEqual(resposta.reference, "trabalho de redes")
-        self.assertTrue(resposta.requiresConfirmation)
+        self.assertFalse(resposta.requiresConfirmation)
 
     def test_remove_atividade(self):
         resposta = interpretar(self.requisicao("Remova o trabalho de redes"))

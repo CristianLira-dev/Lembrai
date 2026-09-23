@@ -2,9 +2,9 @@
 
 ## 1. Objetivo e recorte
 
-A Lembraí é um assistente acadêmico pessoal no WhatsApp. O estudante escreve uma mensagem natural, o sistema interpreta a intenção, apresenta uma confirmação quando a operação altera dados e, somente depois, cria ou modifica a tarefa, agenda lembretes e sincroniza calendários.
+A Lembraí é um assistente acadêmico pessoal no WhatsApp. O estudante escreve uma mensagem natural, o sistema interpreta a intenção, solicita confirmação nas operações protegidas e cria, modifica ou conclui a tarefa, agenda lembretes e sincroniza calendários.
 
-O primeiro incremento implementado neste repositório prioriza o fluxo de ponta a ponta: **mensagem recebida → webhook Evolution API → fila BullMQ → identificação do usuário → chatbot Python → confirmação persistida → tarefa → lembrete → resposta pelo WhatsApp**. O painel React expõe autenticação, dashboard, CRUD de tarefas, lembretes, conversas e integrações. Os provedores de calendário possuem uma abstração real e adaptadores preparados para OAuth; sem credenciais de provedor, o ambiente local usa um modo simulado explícito.
+O primeiro incremento implementado neste repositório prioriza o fluxo de ponta a ponta: **mensagem recebida → webhook Evolution API → fila BullMQ → identificação do usuário → chatbot Python → confirmação persistida quando necessária → tarefa → lembrete → resposta pelo WhatsApp**. O painel React expõe autenticação, dashboard, CRUD de tarefas, lembretes, conversas e integrações. Os provedores de calendário possuem uma abstração real e adaptadores preparados para OAuth; sem credenciais de provedor, o ambiente local usa um modo simulado explícito.
 
 ## 2. Arquitetura completa
 
@@ -146,7 +146,7 @@ O tratamento cobre eventos duplicados, mensagens fora de ordem, falhas e timeout
 
 O backend chama `POST /api/v1/assistente/processar` por HTTP interno com `x-servico-token`. O payload inclui a mensagem e somente o contexto acadêmico necessário. Telefone, e-mail, tokens e identificadores internos não são enviados ao provedor de IA. O chatbot não lê o banco nem executa ações: ele usa saída estruturada para propor intenção e entidades, e o Node.js valida, confirma e executa cada operação.
 
-As intenções cobrem cadastro e consulta de matérias, cadastro, edição, conclusão e remoção de atividades, consulta de pendências e alteração do horário dos lembretes. Toda escrita exige confirmação explícita persistida. Datas relativas são convertidas usando a data e o fuso enviados pelo backend; mensagens ambíguas não executam alterações. O modelo fica limitado a `openrouter/free` ou identificadores `:free`, com interpretador local como contingência.
+As intenções cobrem cadastro e consulta de matérias, cadastro, edição, conclusão e remoção de atividades, consulta de pendências e alteração do horário dos lembretes. A conclusão de uma atividade identificada é imediata; cadastro, edição, remoção e alteração de preferências continuam exigindo confirmação explícita persistida. Datas relativas são convertidas usando a data e o fuso enviados pelo backend; mensagens ambíguas não executam alterações. O modelo fica limitado a `openrouter/free` ou identificadores `:free`, com interpretador local como contingência.
 
 ## 9. Calendários
 

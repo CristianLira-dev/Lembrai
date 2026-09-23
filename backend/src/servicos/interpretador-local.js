@@ -127,7 +127,7 @@ function interpretarLocal({ texto, recebidoEm = new Date(), fuso = 'America/Sao_
   if (/\batrasad[ao]s?\b/.test(baixo)) return { intent: 'list_overdue' };
 
   const acao = acaoSobreTarefa(baixo);
-  if (acao) return { ...acao, requiresConfirmation: true };
+  if (acao) return { ...acao, requiresConfirmation: acao.intent === 'delete_task' };
 
   const edicao = interpretarEdicao(texto, baixo, recebidoEm, fuso, pendente);
   if (edicao) return edicao;

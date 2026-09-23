@@ -130,8 +130,10 @@ class ServicoAssistente {
         const atual = tarefaDoBanco(alvo, usuario.fusoHorario);
         if (acao.intent === 'complete_task') {
           acao.task = atual;
+          // Persiste antes de executar para manter a trava idempotente sem pedir confirmação ao usuário.
           acao.stage = 'confirm';
-          resposta = 'Vou concluir: ' + resumo(atual) + '. Confirma?';
+          await this.guardar(conversa, acao);
+          return this.executar(usuario, conversa, acao);
         } else if (acao.intent === 'delete_task') {
           acao.task = atual;
           acao.stage = 'confirm';
@@ -207,6 +209,10 @@ class ServicoAssistente {
       await this.guardar(conversa, proxima);
       return resposta;
     } catch {
+      if (acao.intent === 'complete_task') {
+        await this.guardar(conversa, null);
+        return 'Não consegui concluir essa atividade agora. Tente novamente em instantes.';
+      }
       // Mesma actionId na repetição: criações são idempotentes.
       await this.guardar(conversa, { ...acao, stage: 'confirm' });
       return 'Não consegui finalizar agora. Confirma de novo para eu tentar novamente?';
