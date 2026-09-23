@@ -211,15 +211,45 @@ test('assunto fora do escopo recebe apenas a resposta definida', async () => {
   assert.equal(resultado.resposta, FORA_ESCOPO);
 });
 
-test('saudações recebem apresentação sem consultar o classificador', async () => {
+test('saudações, inclusive informais, recebem apresentação sem consultar o classificador', async () => {
   const cenario = criarCenario([{ intent: 'unknown', confidence: 0.99 }]);
   const usuario = await criarUsuario(cenario);
-  for (const [indice, texto] of ['ola', 'Olá!', 'oi, tudo bem?', 'bom dia', 'Boa noite, Lembraí', 'e aí?'].entries()) {
+  for (const [indice, texto] of ['ola', 'Olá!', 'oi, tudo bem?', 'bom dia', 'Boa noite, Lembraí', 'e aí?', 'eae', 'salve', 'fala aí'].entries()) {
     const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto, identificadorExterno: `saudacao-${indice}` });
     assert.match(resultado.resposta, /Sou a Lembraí.*atividades e prazos/);
     assert.match(resultado.resposta, /cadastrar.*editar.*concluir.*remover atividades.*mostrar pendências.*ajustar lembretes/);
   }
   assert.equal(cenario.chatbot.chamadas, 0);
+});
+
+test('gírias sociais recebem respostas adequadas sem consultar o classificador', async () => {
+  const cenario = criarCenario([{ intent: 'unknown', confidence: 0.99 }]);
+  const usuario = await criarUsuario(cenario);
+  const casos = [
+    ['blz', /Beleza/], ['show', /Beleza/], ['suave', /Beleza/], ['vlw', /Por nada/],
+    ['obg', /Por nada/], ['tmj', /Estamos juntos/], ['flw', /Até mais/]
+  ];
+  for (const [indice, [texto, esperado]] of casos.entries()) {
+    const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto, identificadorExterno: `giria-${indice}` });
+    assert.match(resultado.resposta, esperado);
+    assert.doesNotMatch(resultado.resposta, /Esse assunto eu não consigo ajudar/);
+  }
+  assert.equal(cenario.chatbot.chamadas, 0);
+});
+
+test('gíria ambígua não confirma edição pendente', async () => {
+  const propostaEdicao = { intent: 'edit_task', confidence: 0.97, reference: 'Trabalho de Redes', task: { dueDate: '2027-10-22' } };
+  const cenario = criarCenario([propostaEdicao]);
+  const usuario = await criarUsuario(cenario);
+  const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'muda o trabalho de redes para 22/10', identificadorExterno: 'giria-edicao-1' });
+  const resposta = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'blz', identificadorExterno: 'giria-edicao-2' });
+
+  assert.match(resposta.resposta, /edição ainda aguarda confirmação/);
+  assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-20');
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'giria-edicao-3' });
+  assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-22');
 });
 
 test('saudação não apaga ação pendente e pedido com saudação continua sendo interpretado', async () => {

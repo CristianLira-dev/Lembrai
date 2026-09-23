@@ -21,7 +21,15 @@ const propostaSchema = z.object({
 function normalizado(s = '') { return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
 function ehSaudacao(texto) {
   const palavras = normalizado(texto).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
-  return /^(?:oi+e?|ola+|opa|e ai|bom dia|boa tarde|boa noite|tudo bem|como vai)(?: (?:tudo bem|como vai|lembrai))?$/.test(palavras);
+  return /^(?:oi+e?|ola+|opa|e ai|eae+|salve|fala(?: ai)?|bom dia|boa tarde|boa noite|tudo bem|como vai)(?: (?:tudo bem|como vai|lembrai))?$/.test(palavras);
+}
+function interacaoSocial(texto) {
+  const palavras = normalizado(texto).replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+  if (/^(?:valeu+|vlw+|obg|obrigad[oa]|agradecido|brigadao)$/.test(palavras)) return { tipo: 'agradecimento', inicio: 'Por nada!' };
+  if (/^(?:tmj|tamo junto|estamos juntos)$/.test(palavras)) return { tipo: 'agradecimento', inicio: 'Estamos juntos!' };
+  if (/^(?:falou|flw+|ate mais|ate logo|tchau|fui)$/.test(palavras)) return { tipo: 'despedida', inicio: 'Até mais!' };
+  if (/^(?:blz+|beleza|show|suave|tranquilo|de boa|demorou|massa|top|bacana|perfeito|certo|ok|fechado|ta bom|tudo certo|joia|joinha)$/.test(palavras)) return { tipo: 'concordancia', inicio: 'Beleza!' };
+  return null;
 }
 function telefoneLimpo(s = '') { return normalizarTelefone(s); }
 function limpo(s) { return typeof s === 'string' ? s.replace(/[*_~\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim() : null; }
@@ -72,6 +80,19 @@ function perguntaFaltante(acao) {
   if (!t.subject) return 'Qual é a matéria?';
   if (!dataValida(t.dueDate)) return 'Qual é a data de entrega? Use dia/mês/ano.';
   return 'O que você quer mudar: nome, data ou matéria?';
+}
+function respostaSocial(texto, pendente = null) {
+  const interacao = interacaoSocial(texto);
+  if (!interacao) return null;
+  if (pendente?.stage === 'confirm') {
+    const operacao = pendente.intent === 'delete_task' ? 'exclusão' : pendente.intent === 'edit_task' ? 'edição' : 'alteração';
+    return interacao.inicio + ' A ' + operacao + ' ainda aguarda confirmação. Responda “sim” para confirmar ou “não” para cancelar.';
+  }
+  if (pendente?.stage === 'ask_time') return interacao.inicio + ' Se quiser mudar o horário dos lembretes, envie no formato 08:30; caso contrário, responda “não”.';
+  if (pendente?.stage === 'collect' || pendente?.stage === 'select') return interacao.inicio + ' ' + perguntaFaltante(pendente);
+  if (interacao.tipo === 'despedida') return interacao.inicio + ' Estarei por aqui quando precisar.';
+  if (interacao.tipo === 'agradecimento') return interacao.inicio + ' Quando precisar organizar suas atividades, é só me chamar.';
+  return interacao.inicio + ' Quando precisar organizar suas atividades, é só me chamar.';
 }
 
 class ServicoAssistente {
@@ -284,6 +305,7 @@ class ServicoAssistente {
     const mensagem = await this.repositorio.salvarMensagem({ conversaId: conversa.id, identificadorMensagemExterna: identificadorExterno || null, direcao: 'entrada', conteudo: texto, tipoMensagem: 'texto', statusProcessamento: 'processando' });
     const pendente = conversa.dadosPendentes?.stage ? structuredClone(conversa.dadosPendentes) : null;
     const comando = comandoExplicito(texto);
+    const social = respostaSocial(texto, pendente);
     let resposta;
     let interpretacao;
     try {
@@ -295,12 +317,14 @@ class ServicoAssistente {
           await this.guardar(conversa, { ...pendente, stage: 'collect' });
           resposta = perguntaFaltante(pendente);
         } else if (pendente?.stage === 'confirm') resposta = await this.executar(usuario, conversa, pendente);
-        else resposta = pendente ? perguntaFaltante(pendente) : 'Não há nada aguardando confirmação. O que você quer registrar ou consultar?';
+        else resposta = pendente ? perguntaFaltante(pendente) : social || 'Não há nada aguardando confirmação. O que você quer registrar ou consultar?';
       } else if (pendente?.stage === 'select' && /^\d+$/.test(texto.trim())) {
         const id = pendente.options[Number(texto.trim()) - 1];
         resposta = id ? await this.preparar(usuario, conversa, { intent: pendente.intent, task: pendente.task }, { ...pendente, targetId: id }) : 'Escolha um dos números da lista.';
       } else if (ehSaudacao(texto)) {
         resposta = SAUDACAO;
+      } else if (social) {
+        resposta = social;
       } else {
         const [tarefas, materias] = await Promise.all([this.repositorio.listarTarefas(usuario.id, { status: 'pendente' }), this.repositorio.listarMaterias(usuario.id)]);
         try {
