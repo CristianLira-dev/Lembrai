@@ -33,6 +33,26 @@ test('repositório filtra tarefas pelo proprietário autenticado', async () => {
   assert.ok(cliente.chamadas.some((item) => item[0] === 'eq' && item[1] === 'status' && item[2] === 'pendente'));
 });
 
+test('repositório restringe conclusão e remoção ao proprietário da tarefa', async () => {
+  const clienteAtualizacao = clienteFake({
+    data: { id: 'tarefa-1', usuarioId: 'usuario-1', status: 'concluida', dataEntrega: '2027-10-20T22:00:00.000Z' },
+    error: null
+  });
+  const repositorioAtualizacao = new RepositorioSupabase(() => clienteAtualizacao);
+  await repositorioAtualizacao.atualizarTarefa('usuario-1', 'tarefa-1', { status: 'concluida' });
+
+  assert.ok(clienteAtualizacao.chamadas.some((item) => item[0] === 'update' && item[1].status === 'concluida'));
+  assert.ok(clienteAtualizacao.chamadas.some((item) => item[0] === 'eq' && item[1] === 'id' && item[2] === 'tarefa-1'));
+  assert.ok(clienteAtualizacao.chamadas.some((item) => item[0] === 'eq' && item[1] === 'usuarioId' && item[2] === 'usuario-1'));
+
+  const clienteRemocao = clienteFake({ data: { id: 'tarefa-1' }, error: null });
+  const repositorioRemocao = new RepositorioSupabase(() => clienteRemocao);
+  assert.equal(await repositorioRemocao.excluirTarefa('usuario-1', 'tarefa-1'), true);
+  assert.ok(clienteRemocao.chamadas.some((item) => item[0] === 'delete'));
+  assert.ok(clienteRemocao.chamadas.some((item) => item[0] === 'eq' && item[1] === 'id' && item[2] === 'tarefa-1'));
+  assert.ok(clienteRemocao.chamadas.some((item) => item[0] === 'eq' && item[1] === 'usuarioId' && item[2] === 'usuario-1'));
+});
+
 test('repositório traduz falha da Data API para indisponibilidade', async () => {
   const cliente = clienteFake({ data: null, error: { code: 'PGRST000', message: 'indisponível' } });
   const repositorio = new RepositorioSupabase(() => cliente);

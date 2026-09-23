@@ -74,12 +74,63 @@ function extrairMateria(texto) {
   return titulo(achado[1].trim().replace(/[.,!?;]+$/g, ''));
 }
 
+function limparReferencia(valor = '') {
+  const referencia = String(valor)
+    .replace(/^(?:a|o|as|os)\s+/, '')
+    .replace(/^(?:tarefa|atividade)\s+(?:de\s+)?/, '')
+    .replace(/\s+como\s+(?:concluida|concluido|finalizada|finalizado|feita|feito)$/, '')
+    .trim();
+  return referencia && !/^(?:tarefa|atividade)$/.test(referencia) ? referencia : null;
+}
+
+function acaoSobreTarefa(baixo) {
+  const marcar = baixo.match(/^(?:marcar|marque|marca)\s+(.+?)\s+como\s+(?:concluida|concluido|finalizada|finalizado|feita|feito)$/)
+    || baixo.match(/^(?:marcar|marque|marca)\s+como\s+(?:concluida|concluido|finalizada|finalizado|feita|feito)\s+(.+)$/);
+  if (marcar) return { intent: 'complete_task', reference: limparReferencia(marcar[1]) };
+
+  const concluir = baixo.match(/^(?:terminei|conclui|finalizei|concluir|conclua|finalizar|finalize)\s*(.*)$/);
+  if (concluir) return { intent: 'complete_task', reference: limparReferencia(concluir[1]) };
+
+  const remover = baixo.match(/^(?:quero\s+)?(?:remover|remova|remove|excluir|exclua|exclui|apagar|apague|deletar|delete)\s*(.*)$/);
+  if (remover) return { intent: 'delete_task', reference: limparReferencia(remover[1]) };
+  return null;
+}
+
+function interpretarEdicao(texto, baixo, recebidoEm, fuso, pendente) {
+  const comando = baixo.match(/^(?:quero\s+)?(?:mudar|mude|alterar|altere|editar|edite|trocar|troque)\s*(.*)$/);
+  if (!comando && pendente?.intent !== 'edit_task') return null;
+
+  const conteudo = comando ? comando[1] : baixo;
+  const campo = conteudo.match(/^(?:a|o)?\s*(nome|titulo|materia|disciplina|data|prazo|horario)\s+(?:da|do|de)\s+(.+?)\s+para\s+(.+)$/);
+  const campoPendente = conteudo.match(/^(?:a|o)?\s*(nome|titulo|materia|disciplina)\s+para\s+(.+)$/);
+  const simples = conteudo.match(/^(.+?)\s+para\s+(.+)$/);
+  const task = {};
+  const data = extrairData(texto, recebidoEm, fuso);
+  const horario = extrairHorario(texto);
+  if (data) task.dueDate = data;
+  if (horario) task.dueTime = horario;
+
+  if (campo?.[1] === 'nome' || campo?.[1] === 'titulo') task.title = titulo(campo[3]);
+  if (campo?.[1] === 'materia' || campo?.[1] === 'disciplina') task.subject = titulo(campo[3]);
+  if (campoPendente?.[1] === 'nome' || campoPendente?.[1] === 'titulo') task.title = titulo(campoPendente[2]);
+  if (campoPendente?.[1] === 'materia' || campoPendente?.[1] === 'disciplina') task.subject = titulo(campoPendente[2]);
+
+  const reference = comando ? limparReferencia(campo?.[2] || simples?.[1] || conteudo) : null;
+  return { intent: 'edit_task', reference, task, requiresConfirmation: true };
+}
+
 function interpretarLocal({ texto, recebidoEm = new Date(), fuso = 'America/Sao_Paulo', pendente = null }) {
   const baixo = normalizado(texto);
   if (/\b(pendencias|pendentes)\b/.test(baixo) || baixo === 'minha agenda' || baixo === 'minhas tarefas') return { intent: 'list_pending' };
   if (/^(?:o que tenho|tarefas|agenda|atividades|pendencias).*hoje/.test(baixo)) return { intent: 'list_today' };
   if (/^(?:o que tenho|tarefas|agenda|atividades|pendencias).*semana/.test(baixo)) return { intent: 'list_week' };
   if (/\batrasad[ao]s?\b/.test(baixo)) return { intent: 'list_overdue' };
+
+  const acao = acaoSobreTarefa(baixo);
+  if (acao) return { ...acao, requiresConfirmation: true };
+
+  const edicao = interpretarEdicao(texto, baixo, recebidoEm, fuso, pendente);
+  if (edicao) return edicao;
 
   const tipoEncontrado = TIPOS.find(([palavra]) => new RegExp(`\\b${palavra}\\b`).test(baixo));
   if (!tipoEncontrado && pendente?.intent !== 'create_task') return { intent: 'unknown' };
@@ -102,4 +153,4 @@ function interpretarLocal({ texto, recebidoEm = new Date(), fuso = 'America/Sao_
   return { intent: 'create_task', task, requiresConfirmation: true };
 }
 
-module.exports = { interpretarLocal, extrairData, extrairHorario, extrairMateria };
+module.exports = { interpretarLocal, extrairData, extrairHorario, extrairMateria, acaoSobreTarefa, interpretarEdicao };

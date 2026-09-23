@@ -20,7 +20,7 @@ log = logging.getLogger("lembrai.ia")
 
 class PropostaIA(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    intent: Literal["create_task", "create_subject", "edit_task", "complete_task",
+    intent: Literal["create_task", "create_subject", "edit_task", "complete_task", "delete_task",
                     "list_pending", "list_today", "list_week", "next_exam", "list_overdue",
                     "list_subjects", "get_reminder_time", "set_reminder_time", "unknown"]
     confidence: float = Field(ge=0, le=1)
@@ -110,7 +110,7 @@ def processar(req, transporte=None):
         return resultado(proposta.intent, confidence=proposta.confidence, task=tarefa,
                          reference=proposta.reference, subject=proposta.subject,
                          reminderTime=proposta.reminderTime, generation=geracao,
-                         requiresConfirmation=proposta.intent in ("create_task", "create_subject", "edit_task", "complete_task", "set_reminder_time"))
+                         requiresConfirmation=proposta.intent in ("create_task", "create_subject", "edit_task", "complete_task", "delete_task", "set_reminder_time"))
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, IndexError, TypeError, ValidationError) as erro:
         # Não registrar payload, chave, cabeçalhos, mensagem nem corpo do provedor.
         codigo = erro.code if isinstance(erro, HTTPError) else type(erro).__name__

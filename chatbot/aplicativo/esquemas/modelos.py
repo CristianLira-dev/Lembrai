@@ -53,7 +53,7 @@ class TarefaInterpretada(BaseModel):
 
 
 class RespostaProcessamento(BaseModel):
-    intent: Literal["create_task", "create_subject", "edit_task", "list_pending", "list_today", "list_week", "next_exam", "list_overdue", "list_subjects", "get_reminder_time", "set_reminder_time", "complete_task", "confirm", "cancel", "unknown"]
+    intent: Literal["create_task", "create_subject", "edit_task", "delete_task", "list_pending", "list_today", "list_week", "next_exam", "list_overdue", "list_subjects", "get_reminder_time", "set_reminder_time", "complete_task", "confirm", "cancel", "unknown"]
     confidence: float = Field(ge=0, le=1)
     requiresConfirmation: bool = False
     missingFields: list[str] = Field(default_factory=list)

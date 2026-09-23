@@ -113,6 +113,22 @@ test('conclusão só é executada depois de confirmação explícita', async () 
   assert.equal((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm, null);
 });
 
+test('fallback local reconhece pedido para marcar atividade como concluída', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+  const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+
+  const proposta = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'marque o trabalho de redes como concluído', identificadorExterno: 'fc-1'
+  });
+  assert.match(proposta.resposta, /Vou concluir:.*Trabalho de Redes.*Confirma/);
+  assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'pendente');
+
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode concluir', identificadorExterno: 'fc-2' });
+  assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).status, 'concluida');
+});
+
 test('edição altera a atividade somente depois da confirmação', async () => {
   const propostaEdicao = { intent: 'edit_task', confidence: 0.97, reference: 'Trabalho de Redes', task: { dueDate: '2027-10-22' } };
   const cenario = criarCenario([propostaEdicao]);
@@ -123,6 +139,49 @@ test('edição altera a atividade somente depois da confirmação', async () => 
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-20');
   await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode alterar', identificadorExterno: 'e-2' });
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-22');
+});
+
+test('fallback local reconhece edição de data', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+  const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+
+  const proposta = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'mude o trabalho de redes para 22/10/2027', identificadorExterno: 'fe-1'
+  });
+  assert.match(proposta.resposta, /Vou alterar.*Trabalho de Redes.*22\/10\/2027.*Confirma/);
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode alterar', identificadorExterno: 'fe-2' });
+  assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-22');
+});
+
+test('fallback local coleta o campo que será editado em duas mensagens', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+  const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+
+  const escolha = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'editar trabalho de redes', identificadorExterno: 'fec-1' });
+  assert.match(escolha.resposta, /O que você quer mudar/);
+  const mudanca = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'matéria para Banco de Dados', identificadorExterno: 'fec-2' });
+  assert.match(mudanca.resposta, /Vou alterar.*Banco De Dados.*Confirma/);
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'fec-3' });
+  assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).materia, 'Banco De Dados');
+});
+
+test('remoção exige confirmação e exclui somente a atividade escolhida', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+  const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+
+  const proposta = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'remova o trabalho de redes', identificadorExterno: 'd-1' });
+  assert.match(proposta.resposta, /Vou remover:.*Trabalho de Redes.*exclui.*Confirma/);
+  assert.ok(await cenario.repositorio.buscarTarefa(usuario.id, criada.tarefa.id));
+
+  const confirmacao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode remover', identificadorExterno: 'd-2' });
+  assert.match(confirmacao.resposta, /atividade removida/);
+  assert.equal(await cenario.repositorio.buscarTarefa(usuario.id, criada.tarefa.id), null);
 });
 
 test('alteração do horário padrão exige confirmação', async () => {
@@ -147,7 +206,7 @@ test('saudações recebem apresentação sem consultar o classificador', async (
   for (const [indice, texto] of ['ola', 'Olá!', 'oi, tudo bem?', 'bom dia', 'Boa noite, Lembraí', 'e aí?'].entries()) {
     const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto, identificadorExterno: `saudacao-${indice}` });
     assert.match(resultado.resposta, /Sou a Lembraí.*atividades e prazos/);
-    assert.match(resultado.resposta, /registrar matérias e atividades.*mostrar pendências.*ajustar seus lembretes/);
+    assert.match(resultado.resposta, /cadastrar.*editar.*concluir.*remover atividades.*mostrar pendências.*ajustar lembretes/);
   }
   assert.equal(cenario.chatbot.chamadas, 0);
 });

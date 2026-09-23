@@ -6,10 +6,10 @@ const { dataNoFuso, dataValida, horarioValido, dataHorarioNoFuso, somarDias, for
 const { normalizarTelefone } = require('../utilitarios/telefone');
 
 const SEM_CONTA = 'Ainda não achei uma conta ligada a esse número. Cria a sua por aqui e depois me chama de novo: https://lembrai-chat.vercel.app/cadastro';
-const FORA_ESCOPO = 'Esse assunto eu não consigo ajudar por aqui. Mas se quiser registrar uma atividade, concluir alguma ou ver suas pendências, é comigo!';
-const SAUDACAO = 'Oi! Sou a Lembraí, sua assistente de atividades e prazos. 📚\nPosso registrar matérias e atividades, mostrar pendências, concluir entregas e ajustar seus lembretes. Como posso ajudar?';
+const FORA_ESCOPO = 'Esse assunto eu não consigo ajudar por aqui. Mas posso cadastrar, editar, concluir ou remover atividades e mostrar suas pendências!';
+const SAUDACAO = 'Oi! Sou a Lembraí, sua assistente de atividades e prazos. 📚\nPosso cadastrar, editar, concluir e remover atividades, além de mostrar pendências e ajustar lembretes. Como posso ajudar?';
 const FALHA = 'Não consegui fazer isso agora. Tenta de novo em instantes?';
-const MUTACOES = ['create_task', 'create_subject', 'complete_task', 'edit_task', 'set_reminder_time'];
+const MUTACOES = ['create_task', 'create_subject', 'complete_task', 'edit_task', 'delete_task', 'set_reminder_time'];
 const CONSULTAS = ['list_pending', 'list_today', 'list_week', 'next_exam', 'list_overdue', 'list_subjects', 'get_reminder_time'];
 const opcional = (max) => z.string().trim().max(max).nullable().optional();
 const propostaSchema = z.object({
@@ -27,7 +27,7 @@ function telefoneLimpo(s = '') { return normalizarTelefone(s); }
 function limpo(s) { return typeof s === 'string' ? s.replace(/[*_~\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim() : null; }
 function comandoExplicito(texto) {
   const t = normalizado(texto).replace(/[.!?]+$/g, '').trim();
-  if (/^(sim|s|confirmo|pode|pode sim|pode registrar|pode salvar|pode concluir|pode alterar|ok|confirmado|fechado)$/.test(t)) return 'confirm';
+  if (/^(sim|s|confirmo|pode|pode sim|pode registrar|pode salvar|pode concluir|pode alterar|pode remover|pode excluir|ok|confirmado|fechado)$/.test(t)) return 'confirm';
   if (/^(nao|n|cancelar|cancela|deixa pra la|nao quero)$/.test(t)) return 'cancel';
   return null;
 }
@@ -46,7 +46,14 @@ function perguntaFaltante(acao) {
   if (acao.intent === 'create_subject') return 'Qual é o nome da matéria?';
   if (acao.intent === 'set_reminder_time') return 'Qual horário você prefere para os lembretes? Use, por exemplo, 08:30.';
   if (acao.stage === 'select') return 'Qual das opções você quer? Envie o número.';
-  if (acao.intent === 'complete_task' || (acao.intent === 'edit_task' && !acao.targetId)) return 'Qual atividade você quer alterar? Envie o nome e a matéria.';
+  if (acao.intent === 'complete_task') return 'Qual atividade você quer concluir? Envie o nome e a matéria.';
+  if (acao.intent === 'delete_task') return 'Qual atividade você quer remover? Envie o nome e a matéria.';
+  if (acao.intent === 'edit_task') {
+    if (!acao.targetId) return 'Qual atividade você quer editar? Envie o nome e a matéria.';
+    if (acao.task?.dueDate && !dataValida(acao.task.dueDate)) return 'Qual é a nova data de entrega? Use dia/mês/ano.';
+    if (acao.task?.dueTime && !horarioValido(acao.task.dueTime)) return 'Qual é o novo horário? Use, por exemplo, 19:30.';
+    return 'O que você quer mudar: nome, data, horário ou matéria?';
+  }
   const t = acao.task || {};
   if (!t.title) return 'Qual é o nome da atividade?';
   if (!t.subject) return 'Qual é a matéria?';
@@ -102,7 +109,7 @@ class ServicoAssistente {
     } else if (acao.intent === 'set_reminder_time' && horarioValido(acao.reminderTime)) {
       acao.stage = 'confirm';
       resposta = 'Vou mudar os lembretes para ' + acao.reminderTime + ', no seu fuso horário. Confirma?';
-    } else if (['complete_task', 'edit_task'].includes(acao.intent)) {
+    } else if (['complete_task', 'edit_task', 'delete_task'].includes(acao.intent)) {
       const tarefas = await this.servicoTarefas.listar(usuario.id, { status: 'pendente' });
       if (proposta.reference && anterior?.reference && normalizado(proposta.reference) !== normalizado(anterior.reference)) acao.targetId = null;
       let alvo = acao.targetId ? tarefas.find((t) => t.id === acao.targetId) : null;
@@ -125,6 +132,10 @@ class ServicoAssistente {
           acao.task = atual;
           acao.stage = 'confirm';
           resposta = 'Vou concluir: ' + resumo(atual) + '. Confirma?';
+        } else if (acao.intent === 'delete_task') {
+          acao.task = atual;
+          acao.stage = 'confirm';
+          resposta = 'Vou remover: ' + resumo(atual) + '. Essa ação exclui a atividade. Confirma?';
         } else {
           // Somente campos presentes na proposta podem modificar a atividade.
           const mudancas = Object.fromEntries(Object.entries(acao.task).filter(([k]) => ['title', 'subject', 'dueDate', 'dueTime'].includes(k)));
@@ -174,6 +185,10 @@ class ServicoAssistente {
       } else if (acao.intent === 'complete_task') {
         const r = await this.servicoTarefas.concluir(usuario.id, acao.targetId);
         resposta = 'Fechou, atividade concluída!' + (r.avisos?.length ? ' ' + r.avisos.join(' ') : '');
+      } else if (acao.intent === 'delete_task') {
+        const removida = await this.servicoTarefas.excluir(usuario.id, acao.targetId);
+        if (!removida) throw new Error('Tarefa não encontrada');
+        resposta = 'Fechou, atividade removida!';
       } else if (acao.intent === 'edit_task') {
         const dados = {};
         if (acao.task.title) dados.titulo = acao.task.title;
@@ -194,7 +209,7 @@ class ServicoAssistente {
     } catch {
       // Mesma actionId na repetição: criações são idempotentes.
       await this.guardar(conversa, { ...acao, stage: 'confirm' });
-      return 'Não consegui finalizar tudo agora. Confirma de novo para eu tentar concluir?';
+      return 'Não consegui finalizar agora. Confirma de novo para eu tentar novamente?';
     }
   }
 

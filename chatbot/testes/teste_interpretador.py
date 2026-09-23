@@ -44,6 +44,32 @@ class TesteInterpretador(unittest.TestCase):
         self.assertEqual(resposta.intent, "confirm")
         self.assertGreater(resposta.confidence, 0.9)
 
+    def test_marca_atividade_como_concluida(self):
+        resposta = interpretar(self.requisicao("Marque o trabalho de redes como concluído"))
+        self.assertEqual(resposta.intent, "complete_task")
+        self.assertEqual(resposta.reference, "trabalho de redes")
+        self.assertTrue(resposta.requiresConfirmation)
+
+    def test_remove_atividade(self):
+        resposta = interpretar(self.requisicao("Remova o trabalho de redes"))
+        self.assertEqual(resposta.intent, "delete_task")
+        self.assertEqual(resposta.reference, "trabalho de redes")
+        self.assertTrue(resposta.requiresConfirmation)
+
+    def test_edita_data_da_atividade(self):
+        resposta = interpretar(self.requisicao("Mude o trabalho de redes para 22/10/2026"))
+        self.assertEqual(resposta.intent, "edit_task")
+        self.assertEqual(resposta.reference, "trabalho de redes")
+        self.assertEqual(resposta.task.dueDate, "2026-10-22")
+        self.assertTrue(resposta.requiresConfirmation)
+
+    def test_completa_campo_de_edicao_pendente(self):
+        pendente = {"intent": "edit_task", "reference": "trabalho de redes", "targetId": "tarefa-1", "task": {}}
+        resposta = interpretar(self.requisicao("matéria para Banco de Dados", pendente))
+        self.assertEqual(resposta.intent, "edit_task")
+        self.assertIsNone(resposta.reference)
+        self.assertEqual(resposta.task.subject, "Banco De Dados")
+
 
 if __name__ == "__main__":
     unittest.main()
