@@ -150,7 +150,7 @@ function interpretarLocal({ texto, recebidoEm = new Date(), fuso = 'America/Sao_
   } else if (!existente.title) task.title = String(texto).trim();
   else if (!existente.subject && !data) task.subject = titulo(texto);
 
-  return { intent: 'create_task', task, requiresConfirmation: true };
+  return { intent: 'create_task', task, requiresConfirmation: false };
 }
 
 module.exports = { interpretarLocal, extrairData, extrairHorario, extrairMateria, acaoSobreTarefa, interpretarEdicao };

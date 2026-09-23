@@ -34,7 +34,7 @@ class TesteOpenRouter(unittest.TestCase):
 
         resposta = processar(self.requisicao(), transporte)
         self.assertEqual(resposta.intent, "create_task")
-        self.assertTrue(resposta.requiresConfirmation)
+        self.assertFalse(resposta.requiresConfirmation)
         self.assertEqual(resposta.generation["status"], "complete")
         enviado = capturado["messages"][1]["content"]
         self.assertNotIn("auth-1", enviado)

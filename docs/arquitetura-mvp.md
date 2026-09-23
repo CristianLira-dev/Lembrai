@@ -146,7 +146,7 @@ O tratamento cobre eventos duplicados, mensagens fora de ordem, falhas e timeout
 
 O backend chama `POST /api/v1/assistente/processar` por HTTP interno com `x-servico-token`. O payload inclui a mensagem e somente o contexto acadêmico necessário. Telefone, e-mail, tokens e identificadores internos não são enviados ao provedor de IA. O chatbot não lê o banco nem executa ações: ele usa saída estruturada para propor intenção e entidades, e o Node.js valida, confirma e executa cada operação.
 
-As intenções cobrem cadastro e consulta de matérias, cadastro, edição, conclusão e remoção de atividades, consulta de pendências e alteração do horário dos lembretes. A conclusão de uma atividade identificada é imediata; cadastro, edição, remoção e alteração de preferências continuam exigindo confirmação explícita persistida. Datas relativas são convertidas usando a data e o fuso enviados pelo backend; mensagens ambíguas não executam alterações. O modelo fica limitado a `openrouter/free` ou identificadores `:free`, com interpretador local como contingência.
+As intenções cobrem cadastro e consulta de matérias, cadastro, edição, conclusão e remoção de atividades, consulta de pendências e alteração do horário dos lembretes. O cadastro com todos os dados necessários e a conclusão de uma atividade identificada são imediatos; edição, remoção, cadastro de matéria e alteração de preferências continuam exigindo confirmação explícita persistida. Datas relativas são convertidas usando a data e o fuso enviados pelo backend; mensagens ambíguas não executam alterações. O modelo fica limitado a `openrouter/free` ou identificadores `:free`, com interpretador local como contingência.
 
 ## 9. Calendários
 

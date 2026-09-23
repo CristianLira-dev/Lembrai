@@ -20,7 +20,7 @@ class TesteInterpretador(unittest.TestCase):
         self.assertEqual(resposta.task.subject, "Matemática")
         self.assertEqual(resposta.task.dueTime, "19:00")
         self.assertEqual(resposta.missingFields, [])
-        self.assertTrue(resposta.requiresConfirmation)
+        self.assertFalse(resposta.requiresConfirmation)
 
     def test_pergunta_materia_quando_ambigua(self):
         resposta = interpretar(self.requisicao("Tenho prova sexta"))
@@ -37,7 +37,7 @@ class TesteInterpretador(unittest.TestCase):
         resposta = interpretar(self.requisicao("Programação", pendente))
         self.assertEqual(resposta.task.subject, "Programação")
         self.assertEqual(resposta.missingFields, [])
-        self.assertTrue(resposta.requiresConfirmation)
+        self.assertFalse(resposta.requiresConfirmation)
 
     def test_confirmacao(self):
         resposta = interpretar(self.requisicao("Sim"))

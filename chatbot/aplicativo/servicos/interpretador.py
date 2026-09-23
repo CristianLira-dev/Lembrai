@@ -142,4 +142,4 @@ def interpretar(req: RequisicaoProcessamento) -> RespostaProcessamento:
         tarefa.dueDateTime = combinar_data_horario(date.fromisoformat(tarefa.dueDate), tarefa.dueTime, req.user.timezone)
     faltantes = [campo for campo in ("title", "subject", "dueDate") if not getattr(tarefa, campo)]
     perguntas = {"title": "Qual é o nome da atividade?", "subject": "Qual é a matéria?", "dueDate": "Qual é a data de entrega?"}
-    return resultado("create_task", task=tarefa, requiresConfirmation=True, missingFields=faltantes, response=perguntas[faltantes[0]] if faltantes else "Confirma o registro?")
+    return resultado("create_task", task=tarefa, requiresConfirmation=False, missingFields=faltantes, response=perguntas[faltantes[0]] if faltantes else "")

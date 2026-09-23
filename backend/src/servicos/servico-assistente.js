@@ -100,8 +100,10 @@ class ServicoAssistente {
     if (acao.intent === 'create_task') {
       if (acao.task.title && acao.task.subject && dataValida(acao.task.dueDate)) {
         if (acao.task.dueTime && !horarioValido(acao.task.dueTime)) acao.task.dueTime = null;
+        // Reserva a ação contra duplicidade e registra na mesma mensagem, sem confirmação visível.
         acao.stage = 'confirm';
-        resposta = 'Vou registrar: ' + resumo(acao.task) + '. Confirma?';
+        await this.guardar(conversa, acao);
+        return this.executar(usuario, conversa, acao);
       }
     } else if (acao.intent === 'create_subject' && acao.subject) {
       acao.stage = 'confirm';
@@ -209,6 +211,12 @@ class ServicoAssistente {
       await this.guardar(conversa, proxima);
       return resposta;
     } catch {
+      if (acao.intent === 'create_task') {
+        let existente = null;
+        try { existente = await this.repositorio.buscarTarefa(usuario.id, acao.actionId); } catch {}
+        try { await this.guardar(conversa, null); } catch {}
+        return existente ? 'Fechou, registrado!' : 'Não consegui registrar essa atividade agora. Tente novamente em instantes.';
+      }
       if (acao.intent === 'complete_task') {
         await this.guardar(conversa, null);
         return 'Não consegui concluir essa atividade agora. Tente novamente em instantes.';

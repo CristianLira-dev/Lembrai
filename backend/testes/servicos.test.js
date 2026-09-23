@@ -80,23 +80,20 @@ test('número sem conta recebe cadastro e não cria perfil provisório', async (
   assert.equal(cenario.chatbot.chamadas, 0);
 });
 
-test('criação exige confirmação, agenda lembrete e pergunta o horário uma vez', async () => {
+test('criação é imediata, agenda lembrete e pergunta o horário uma vez', async () => {
   const cenario = criarCenario([atividade]);
   const usuario = await criarUsuario(cenario);
 
-  const proposta = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'trabalho de redes dia 20/10', identificadorExterno: 'm-1' });
-  assert.match(proposta.resposta, /Vou registrar:.*Confirma/);
-  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 0);
-
-  const confirmacao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'm-2' });
+  const cadastro = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'trabalho de redes dia 20/10', identificadorExterno: 'm-1' });
   const criadas = await cenario.tarefas.listar(usuario.id);
   assert.equal(criadas.length, 1);
   assert.equal(criadas[0].materia, 'Sistemas Operacionais');
-  assert.match(confirmacao.resposta, /Os lembretes chegam às 07:27/);
+  assert.match(cadastro.resposta, /Fechou, registrado/);
+  assert.match(cadastro.resposta, /Os lembretes chegam às 07:27/);
   assert.equal((await cenario.repositorio.listarLembretes(usuario.id)).length, 0);
   assert.ok((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm);
 
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'não', identificadorExterno: 'm-3' });
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'não', identificadorExterno: 'm-2' });
   assert.match(cenario.mensagens.at(-1).texto, /mantive o horário/);
 });
 
@@ -211,11 +208,12 @@ test('saudação não apaga ação pendente e pedido com saudação continua sen
   const cenario = criarCenario([atividade]);
   const usuario = await criarUsuario(cenario);
   const pedido = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'Olá, registrar trabalho de Redes', identificadorExterno: 'pedido-com-ola' });
-  assert.match(pedido.resposta, /Vou registrar:.*Confirma/);
+  assert.match(pedido.resposta, /Fechou, registrado/);
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
   const saudacao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'oi', identificadorExterno: 'oi-pendente' });
   assert.match(saudacao.resposta, /Sou a Lembraí/);
   assert.equal(cenario.chatbot.chamadas, 1);
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'confirma-depois-oi' });
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'não', identificadorExterno: 'cancela-horario-depois-oi' });
   assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
 });
 
@@ -243,15 +241,7 @@ test('fallback local registra atividade no usuário identificado pelo telefone',
     identificadorExterno: 'fallback-1',
     recebidoEm: new Date('2026-09-21T15:00:00Z')
   });
-  assert.match(proposta.resposta, /Vou registrar:.*Banco De Dados.*25\/09\/2027.*19:00.*Confirma/);
-  assert.equal((await cenario.tarefas.listar(usuarioCorreto.id)).length, 0);
-
-  await cenario.assistente.processarEntrada({
-    telefone: usuarioCorreto.telefone,
-    texto: 'sim',
-    identificadorExterno: 'fallback-2',
-    recebidoEm: new Date('2026-09-21T15:01:00Z')
-  });
+  assert.match(proposta.resposta, /Fechou, registrado/);
 
   const tarefasCorretas = await cenario.tarefas.listar(usuarioCorreto.id);
   assert.equal(tarefasCorretas.length, 1);
@@ -260,7 +250,7 @@ test('fallback local registra atividade no usuário identificado pelo telefone',
   assert.equal((await cenario.tarefas.listar(outroUsuario.id)).length, 0);
 });
 
-test('fallback local coleta apenas o dado ausente antes de confirmar', async () => {
+test('fallback local coleta apenas o dado ausente antes de registrar', async () => {
   const cenario = criarCenario([]);
   cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
   const usuario = await criarUsuario(cenario);
@@ -273,5 +263,6 @@ test('fallback local coleta apenas o dado ausente antes de confirmar', async () 
   const segunda = await cenario.assistente.processarEntrada({
     telefone: usuario.telefone, texto: 'Engenharia de Software', identificadorExterno: 'coleta-2'
   });
-  assert.match(segunda.resposta, /Vou registrar:.*Engenharia De Software.*Confirma/);
+  assert.match(segunda.resposta, /Fechou, registrado/);
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
 });

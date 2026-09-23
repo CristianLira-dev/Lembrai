@@ -110,7 +110,7 @@ def processar(req, transporte=None):
         return resultado(proposta.intent, confidence=proposta.confidence, task=tarefa,
                          reference=proposta.reference, subject=proposta.subject,
                          reminderTime=proposta.reminderTime, generation=geracao,
-                         requiresConfirmation=proposta.intent in ("create_task", "create_subject", "edit_task", "delete_task", "set_reminder_time"))
+                         requiresConfirmation=proposta.intent in ("create_subject", "edit_task", "delete_task", "set_reminder_time"))
     except (HTTPError, URLError, TimeoutError, OSError, ValueError, KeyError, IndexError, TypeError, ValidationError) as erro:
         # Não registrar payload, chave, cabeçalhos, mensagem nem corpo do provedor.
         codigo = erro.code if isinstance(erro, HTTPError) else type(erro).__name__

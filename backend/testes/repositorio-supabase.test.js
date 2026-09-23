@@ -33,6 +33,26 @@ test('repositório filtra tarefas pelo proprietário autenticado', async () => {
   assert.ok(cliente.chamadas.some((item) => item[0] === 'eq' && item[1] === 'status' && item[2] === 'pendente'));
 });
 
+test('repositório inclui o proprietário ao inserir uma tarefa imediatamente', async () => {
+  const cliente = clienteFake({
+    data: {
+      id: 'tarefa-1', usuarioId: 'usuario-1', titulo: 'Prova', materia: 'Lógica E Algoritmos',
+      status: 'pendente', dataEntrega: '2026-09-23T23:59:00.000Z'
+    },
+    error: null
+  });
+  const repositorio = new RepositorioSupabase(() => cliente);
+
+  await repositorio.criarTarefa({
+    id: 'tarefa-1', usuarioId: 'usuario-1', titulo: 'Prova', materia: 'Lógica E Algoritmos',
+    dataEntrega: new Date('2026-09-23T23:59:00.000Z')
+  });
+
+  assert.ok(cliente.chamadas.some((item) => item[0] === 'insert'
+    && item[1].usuarioId === 'usuario-1'
+    && item[1].status === 'pendente'));
+});
+
 test('repositório restringe conclusão e remoção ao proprietário da tarefa', async () => {
   const clienteAtualizacao = clienteFake({
     data: { id: 'tarefa-1', usuarioId: 'usuario-1', status: 'concluida', dataEntrega: '2027-10-20T22:00:00.000Z' },
