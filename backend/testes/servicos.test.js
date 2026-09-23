@@ -88,13 +88,31 @@ test('criação é imediata, agenda lembrete e pergunta o horário uma vez', asy
   const criadas = await cenario.tarefas.listar(usuario.id);
   assert.equal(criadas.length, 1);
   assert.equal(criadas[0].materia, 'Sistemas Operacionais');
-  assert.match(cadastro.resposta, /Fechou, registrado/);
+  assert.match(cadastro.resposta, /Trabalho de Redes \(Sistemas Operacionais\) marcado para o dia 20\/10\/2027 às 19:00/);
+  assert.doesNotMatch(cadastro.resposta, /Confirma/);
   assert.match(cadastro.resposta, /Os lembretes chegam às 07:27/);
   assert.equal((await cenario.repositorio.listarLembretes(usuario.id)).length, 0);
   assert.ok((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm);
 
   await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'não', identificadorExterno: 'm-2' });
   assert.match(cenario.mensagens.at(-1).texto, /mantive o horário/);
+});
+
+test('cadastro informa atividade e data sem pedir confirmação', async () => {
+  const prova = {
+    intent: 'create_task', confidence: 0.99,
+    task: { title: 'Prova', subject: 'Inglês', type: 'exam', dueDate: '2026-08-12', dueTime: null }
+  };
+  const cenario = criarCenario([prova]);
+  const usuario = await criarUsuario(cenario);
+
+  const cadastro = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'Prova de inglês dia 12/08/2026', identificadorExterno: 'cadastro-resumo-1'
+  });
+
+  assert.match(cadastro.resposta, /^Prova de Inglês marcada para o dia 12\/08\/2026\./);
+  assert.doesNotMatch(cadastro.resposta, /Confirma/);
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
 });
 
 test('conclusão é executada imediatamente quando a atividade é identificada', async () => {
@@ -208,7 +226,7 @@ test('saudação não apaga ação pendente e pedido com saudação continua sen
   const cenario = criarCenario([atividade]);
   const usuario = await criarUsuario(cenario);
   const pedido = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'Olá, registrar trabalho de Redes', identificadorExterno: 'pedido-com-ola' });
-  assert.match(pedido.resposta, /Fechou, registrado/);
+  assert.match(pedido.resposta, /marcado para o dia/);
   assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
   const saudacao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'oi', identificadorExterno: 'oi-pendente' });
   assert.match(saudacao.resposta, /Sou a Lembraí/);
@@ -241,7 +259,7 @@ test('fallback local registra atividade no usuário identificado pelo telefone',
     identificadorExterno: 'fallback-1',
     recebidoEm: new Date('2026-09-21T15:00:00Z')
   });
-  assert.match(proposta.resposta, /Fechou, registrado/);
+  assert.match(proposta.resposta, /Trabalho de Banco De Dados marcado para o dia 25\/09\/2027 às 19:00/);
 
   const tarefasCorretas = await cenario.tarefas.listar(usuarioCorreto.id);
   assert.equal(tarefasCorretas.length, 1);
@@ -263,6 +281,6 @@ test('fallback local coleta apenas o dado ausente antes de registrar', async () 
   const segunda = await cenario.assistente.processarEntrada({
     telefone: usuario.telefone, texto: 'Engenharia de Software', identificadorExterno: 'coleta-2'
   });
-  assert.match(segunda.resposta, /Fechou, registrado/);
+  assert.match(segunda.resposta, /Atividade de Engenharia De Software marcada para o dia 28\/09\/2027/);
   assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
 });

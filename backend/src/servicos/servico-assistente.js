@@ -41,6 +41,19 @@ function dadosTarefa(t) {
 function resumo(t) {
   return '*' + limpo(t.title) + '* — ' + limpo(t.subject) + ' — entrega ' + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '');
 }
+function mensagemCadastro(t) {
+  const titulo = limpo(t.title);
+  const materia = limpo(t.subject);
+  const tipo = normalizado(t.type);
+  const tituloNormalizado = normalizado(titulo);
+  const feminino = ['exam', 'task', 'class'].includes(tipo)
+    || /^(prova|tarefa|atividade|aula|apresentacao|entrega|avaliacao)\b/.test(tituloNormalizado);
+  const identificacao = /\b(?:de|da|do)\b/.test(tituloNormalizado)
+    ? titulo + ' (' + materia + ')'
+    : titulo + ' de ' + materia;
+  return identificacao + ' ' + (feminino ? 'marcada' : 'marcado')
+    + ' para o dia ' + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '') + '.';
+}
 function tarefaDoBanco(t, fuso) { return { title: t.titulo, subject: t.materia, dueDate: dataNoFuso(t.dataEntrega, fuso), dueTime: t.horarioEntrega || null }; }
 function perguntaFaltante(acao) {
   if (acao.intent === 'create_subject') return 'Qual é o nome da matéria?';
@@ -175,7 +188,7 @@ class ServicoAssistente {
     try {
       if (acao.intent === 'create_task') {
         const resultado = await this.servicoTarefas.criar(usuario.id, { ...acao.task, timezone: usuario.fusoHorario }, { idTarefa: acao.actionId, horarioPadrao: true, sincronizarCalendario: true });
-        resposta = 'Fechou, registrado!';
+        resposta = mensagemCadastro(acao.task);
         if (resultado.avisos.length) resposta += ' ' + resultado.avisos.join(' ') + ' Tenta ajustar de novo em instantes.';
         else if (!resultado.lembreteAgendado) resposta += ' O prazo está próximo ou passou; não há um horário de lembrete futuro antes da entrega.';
         if (!usuario.preferenciaLembretesPerguntada) {
@@ -215,7 +228,7 @@ class ServicoAssistente {
         let existente = null;
         try { existente = await this.repositorio.buscarTarefa(usuario.id, acao.actionId); } catch {}
         try { await this.guardar(conversa, null); } catch {}
-        return existente ? 'Fechou, registrado!' : 'Não consegui registrar essa atividade agora. Tente novamente em instantes.';
+        return existente ? mensagemCadastro(tarefaDoBanco(existente, usuario.fusoHorario)) : 'Não consegui registrar essa atividade agora. Tente novamente em instantes.';
       }
       if (acao.intent === 'complete_task') {
         await this.guardar(conversa, null);
