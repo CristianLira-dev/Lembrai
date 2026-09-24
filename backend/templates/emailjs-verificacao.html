@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Código de verificação Lembraí</title>
+  </head>
+  <body style="margin:0;background:#0f1115;font-family:Arial,Helvetica,sans-serif;color:#f7f7f8;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#0f1115;padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#181b21;border:1px solid #2a2f38;border-radius:18px;overflow:hidden;">
+            <tr>
+              <td style="padding:30px 34px 12px;color:#ff4778;font-size:20px;font-weight:700;">✦ Lembraí</td>
+            </tr>
+            <tr>
+              <td style="padding:14px 34px 8px;">
+                <h1 style="margin:0 0 14px;font-size:28px;line-height:1.2;color:#ffffff;">Confirme que é você</h1>
+                <p style="margin:0;color:#b8bec9;font-size:16px;line-height:1.6;">Olá, {{to_name}}. Use o código abaixo para {{purpose_label}} na Lembraí.</p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:24px 34px;">
+                <div style="display:inline-block;padding:18px 28px;border:1px solid #85dbd8;border-radius:12px;background:#111419;color:#ffffff;font-family:'Courier New',monospace;font-size:34px;font-weight:700;letter-spacing:8px;">{{auth_code}}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:0 34px 30px;">
+                <p style="margin:0 0 10px;color:#b8bec9;font-size:14px;line-height:1.6;">O código expira em {{expires_minutes}} minutos e pode ser usado uma única vez.</p>
+                <p style="margin:0;color:#7f8793;font-size:13px;line-height:1.6;">Se você não solicitou este código, ignore esta mensagem. Nunca compartilhe o código com outras pessoas.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>
