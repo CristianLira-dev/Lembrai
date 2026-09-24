@@ -8,7 +8,6 @@ __pycache__/
 dist/
 coverage/
 .env.*
-!.env.example
 .prisma/
 supabase/.temp/
 
