@@ -48,6 +48,9 @@ export function PaginaEntrada() {
 
       <div className="autenticacao-forma">
         <div className="caixa-autenticacao">
+          <Link className="autenticacao-voltar" to="/">
+            <span aria-hidden="true">←</span> Voltar para a página inicial
+          </Link>
           <p className="etiqueta">Bem-vindo de volta</p>
           <h2>Entre no seu espaço</h2>
           <p className="subtitulo">

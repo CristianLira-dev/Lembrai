@@ -80,6 +80,9 @@ export function PaginaCadastro() {
 
       <div className="autenticacao-forma">
         <div className="caixa-autenticacao">
+          <Link className="autenticacao-voltar" to="/">
+            <span aria-hidden="true">←</span> Voltar para a página inicial
+          </Link>
           <p className="etiqueta">Comece por aqui</p>
           <h2>Crie seu espaço</h2>
 
