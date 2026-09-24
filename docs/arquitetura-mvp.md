@@ -156,7 +156,7 @@ Sem `GOOGLE_CLIENT_ID`, `OUTLOOK_CLIENT_ID` e respectivas chaves, o painel apres
 
 ## 10. Filas, lembretes e resumo diário
 
-O Redis sustenta as filas BullMQ `processamento-mensagens`, `processamento-lembretes`, `sincronizacao-calendarios`, `envio-whatsapp` e `resumo-diario`. O webhook não mantém requisição aberta. O worker de lembretes confirma que a tarefa continua pendente, envia a mensagem, atualiza o status e aplica tentativas com backoff. O resumo diário é gerado pelo Node.js a partir das tarefas e pode ser ativado posteriormente por um scheduler externo.
+O Redis sustenta as filas BullMQ `processamento-mensagens`, `processamento-lembretes`, `sincronizacao-calendarios`, `envio-whatsapp` e `resumo-diario`. O webhook não mantém requisição aberta. O worker de lembretes confirma que a tarefa continua pendente, envia a mensagem, atualiza o status e aplica tentativas com backoff. O resumo de pendências é enviado diariamente pelo Node.js, no horário configurado pelo usuário, enquanto houver atividades pendentes.
 
 ## 11. Rotas do backend
 

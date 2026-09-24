@@ -38,7 +38,7 @@ test('calcula lembrete um dia antes', () => {
   assert.equal(agendamento.toISOString(), '2027-08-27T22:00:00.000Z');
 });
 
-test('envia um resumo detalhado a cada dois dias para cada usuário com pendências', async () => {
+test('envia um resumo detalhado todos os dias para cada usuário com pendências', async () => {
   const cenario = criarCenario();
   const usuario = await criarUsuario(cenario);
   await cenario.repositorio.criarTarefa({
@@ -60,11 +60,34 @@ test('envia um resumo detalhado a cada dois dias para cada usuário com pendênc
   assert.match(cenario.mensagens[0].texto, /20\/10\/2027/);
   assert.match(cenario.mensagens[0].texto, /22\/10\/2027/);
 
-  const antesDeDoisDias = await lembretes.processarResumosPendentes(new Date('2027-10-20T10:26:00.000Z'));
-  assert.equal(antesDeDoisDias.enviados, 0);
-  const segundo = await lembretes.processarResumosPendentes(new Date('2027-10-20T10:27:00.000Z'));
+  const antesDoDiaSeguinte = await lembretes.processarResumosPendentes(new Date('2027-10-19T10:26:00.000Z'));
+  assert.equal(antesDoDiaSeguinte.enviados, 0);
+  const segundo = await lembretes.processarResumosPendentes(new Date('2027-10-19T10:27:00.000Z'));
   assert.equal(segundo.enviados, 1);
   assert.equal(cenario.mensagens.length, 2);
+});
+
+test('antecipa o agendamento antigo de dois dias e envia o resumo diário pendente', async () => {
+  const cenario = criarCenario();
+  const usuario = await criarUsuario(cenario);
+  await cenario.repositorio.criarTarefa({
+    usuarioId: usuario.id, titulo: 'Prova de Algoritmos', materia: 'Algoritmos',
+    dataEntrega: new Date('2027-10-22T22:00:00.000Z')
+  });
+  await cenario.repositorio.atualizarUsuario(usuario.id, {
+    ultimoResumoPendenciasEm: new Date('2027-10-18T10:27:00.000Z'),
+    proximoResumoPendenciasEm: new Date('2027-10-20T10:27:00.000Z')
+  });
+
+  const lembretes = new ServicoLembretes({ repositorio: cenario.repositorio, servicoWhatsapp: cenario.whatsapp });
+  const resultado = await lembretes.processarResumosPendentes(new Date('2027-10-19T13:00:00.000Z'));
+
+  assert.equal(resultado.enviados, 1);
+  assert.match(cenario.mensagens[0].texto, /Prova de Algoritmos/);
+  assert.equal(
+    new Date((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).proximoResumoPendenciasEm).toISOString(),
+    '2027-10-20T10:27:00.000Z'
+  );
 });
 
 test('normaliza cadastro brasileiro para o formato entregue pela Evolution', () => {

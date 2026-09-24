@@ -1,4 +1,4 @@
-const { formatarResumoPendencias, proximoResumoBienal, proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
+const { formatarResumoPendencias, proximoResumoDiario, proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
 
 class ServicoLembretes {
   constructor({ repositorio, servicoWhatsapp }) {
@@ -16,7 +16,17 @@ class ServicoLembretes {
   async excluir(usuarioId, id) { return this.repositorio.excluirLembrete(usuarioId, id); }
 
   async agendarResumoInicial(usuario, agora = new Date()) {
-    if (usuario.proximoResumoPendenciasEm) return new Date(usuario.proximoResumoPendenciasEm);
+    if (usuario.proximoResumoPendenciasEm) {
+      const proximoAgendado = new Date(usuario.proximoResumoPendenciasEm);
+      if (usuario.ultimoResumoPendenciasEm) {
+        const proximoDiario = proximoResumoDiario(usuario, new Date(usuario.ultimoResumoPendenciasEm));
+        if (proximoDiario < proximoAgendado) {
+          await this.repositorio.atualizarUsuario(usuario.id, { proximoResumoPendenciasEm: proximoDiario });
+          return proximoDiario;
+        }
+      }
+      return proximoAgendado;
+    }
     const proximo = proximoResumoInicial(usuario, agora);
     await this.repositorio.atualizarUsuario(usuario.id, { proximoResumoPendenciasEm: proximo });
     return proximo;
@@ -39,7 +49,7 @@ class ServicoLembretes {
         await this.servicoWhatsapp.enviarResposta(usuario.telefone, formatarResumoPendencias(tarefas, usuario));
         await this.repositorio.atualizarUsuario(usuario.id, {
           ultimoResumoPendenciasEm: agora,
-          proximoResumoPendenciasEm: proximoResumoBienal(usuario, agora)
+          proximoResumoPendenciasEm: proximoResumoDiario(usuario, agora)
         });
         resultado.enviados += 1;
       } catch (erro) {

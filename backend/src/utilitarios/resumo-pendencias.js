@@ -18,9 +18,9 @@ function proximoResumoInicial(usuario, agora = new Date()) {
     : dataHorarioNoFuso(somarDias(hoje, 1), horario, fuso);
 }
 
-function proximoResumoBienal(usuario, agora = new Date()) {
+function proximoResumoDiario(usuario, agora = new Date()) {
   const fuso = fusoDoUsuario(usuario);
-  return dataHorarioNoFuso(somarDias(dataNoFuso(agora, fuso), 2), horarioDoUsuario(usuario), fuso);
+  return dataHorarioNoFuso(somarDias(dataNoFuso(agora, fuso), 1), horarioDoUsuario(usuario), fuso);
 }
 
 function formatarPrazo(dataEntrega, horarioEntrega, fuso) {
@@ -39,4 +39,4 @@ function formatarResumoPendencias(tarefas, usuario) {
   return '📚 Suas atividades pendentes:\n\n' + itens.join('\n\n') + '\n\nQuando concluir alguma, me avisa por aqui!';
 }
 
-module.exports = { proximoResumoInicial, proximoResumoBienal, formatarResumoPendencias };
+module.exports = { proximoResumoInicial, proximoResumoDiario, formatarResumoPendencias };
