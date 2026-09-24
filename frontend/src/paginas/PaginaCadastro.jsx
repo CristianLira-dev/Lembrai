@@ -51,7 +51,7 @@ export function PaginaCadastro() {
         ...dados,
         telefone
       });
-      navegar('/painel', { replace: true });
+      navegar('/authcode');
     } catch (erroApi) {
       setErro(erroApi.message || 'Não foi possível criar sua conta.');
     } finally {
@@ -175,7 +175,7 @@ export function PaginaCadastro() {
               disabled={enviando}
               type="submit"
             >
-              {enviando ? 'Criando...' : 'Criar meu espaço →'}
+              {enviando ? 'Enviando código...' : 'Verificar meu e-mail →'}
             </button>
           </form>
 
