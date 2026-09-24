@@ -21,6 +21,13 @@ module.exports = {
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseChavePublica: process.env.SUPABASE_PUBLISHABLE_KEY || '',
   supabaseChaveSecreta: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  codigoVerificacaoSegredo: process.env.CODIGO_VERIFICACAO_SEGREDO || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  emailjs: {
+    serviceId: process.env.EMAILJS_SERVICE_ID || '',
+    templateId: process.env.EMAILJS_TEMPLATE_ID || '',
+    publicKey: process.env.EMAILJS_PUBLIC_KEY || '',
+    privateKey: process.env.EMAILJS_PRIVATE_KEY || ''
+  },
   jwtSegredo: process.env.JWT_SEGREDO || 'desenvolvimento-troque-este-segredo',
   jwtExpiracao: process.env.JWT_EXPIRACAO || '7d',
   urlChatbot: process.env.URL_CHATBOT || 'http://localhost:8000',
