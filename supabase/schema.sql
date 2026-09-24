@@ -177,6 +177,25 @@ CREATE TABLE "RegistroSincronizacao" (
     CONSTRAINT "RegistroSincronizacao_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "CodigoVerificacaoEmail" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "finalidade" TEXT NOT NULL,
+    "codigoHash" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "tipoToken" TEXT NOT NULL,
+    "usuarioAuthId" TEXT NOT NULL,
+    "tentativas" SMALLINT NOT NULL DEFAULT 0,
+    "expiraEm" TIMESTAMP(3) NOT NULL,
+    "usadoEm" TIMESTAMP(3),
+    "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "CodigoVerificacaoEmail_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "CodigoVerificacaoEmail_finalidade_check" CHECK ("finalidade" IN ('cadastro', 'entrada')),
+    CONSTRAINT "CodigoVerificacaoEmail_tentativas_check" CHECK ("tentativas" BETWEEN 0 AND 5)
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Usuario_telefone_key" ON "Usuario"("telefone");
 
@@ -240,6 +259,12 @@ CREATE UNIQUE INDEX "EventoWebhook_provedor_identificadorEventoExterno_key" ON "
 -- CreateIndex
 CREATE INDEX "RegistroSincronizacao_usuarioId_provedor_iniciadoEm_idx" ON "RegistroSincronizacao"("usuarioId", "provedor", "iniciadoEm");
 
+-- CreateIndex
+CREATE INDEX "CodigoVerificacaoEmail_email_finalidade_criadoEm_idx" ON "CodigoVerificacaoEmail"("email", "finalidade", "criadoEm");
+
+-- CreateIndex
+CREATE INDEX "CodigoVerificacaoEmail_expiraEm_idx" ON "CodigoVerificacaoEmail"("expiraEm");
+
 -- AddForeignKey
 ALTER TABLE "Tarefa" ADD CONSTRAINT "Tarefa_usuarioId_fkey" FOREIGN KEY ("usuarioId") REFERENCES "Usuario"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -275,3 +300,7 @@ ALTER TABLE "RegistroSincronizacao" ADD CONSTRAINT "RegistroSincronizacao_usuari
 
 ALTER TABLE "Materia" ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE "Materia" FROM anon, authenticated;
+
+ALTER TABLE "CodigoVerificacaoEmail" ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON TABLE "CodigoVerificacaoEmail" FROM anon, authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "CodigoVerificacaoEmail" TO service_role;

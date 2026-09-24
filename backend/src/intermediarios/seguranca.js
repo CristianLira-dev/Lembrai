@@ -43,7 +43,7 @@ function tratarErros(erro, req, res, proximo) {
   const status = bancoIndisponivel ? 503 : (erro.statusCode || 500);
   const mensagem = bancoIndisponivel
     ? 'Banco de dados temporariamente indisponível'
-    : (status >= 500 ? 'Erro interno do servidor' : erro.message);
+    : (status >= 500 && !erro.exporMensagem ? 'Erro interno do servidor' : erro.message);
   return res.status(status).json({ erro: mensagem, ...(erro.detalhes ? { detalhes: erro.detalhes } : {}) });
 }
 

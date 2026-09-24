@@ -15,12 +15,15 @@ const sessao = { access_token: 'jwt-do-supabase', refresh_token: 'refresh-do-sup
 function resposta() {
   return { statusCode: 200, body: null, status(n) { this.statusCode = n; return this; }, json(d) { this.body = d; return this; } };
 }
-function cenario(auth = {}, admin = {}) {
+function cenario(auth = {}, admin = {}, email = {}) {
   const repositorio = new RepositorioMemoria();
   const chamadas = [];
   const chamadasAdmin = [];
+  const emails = [];
   const cliente = { auth: {
-    async signInWithPassword(d) { chamadas.push(d); return { data: { session: sessao }, error: null }; },
+    async signInWithPassword(d) { chamadas.push({ operacao: 'senha', dados: d }); return { data: { session: sessao, user: identidade }, error: null }; },
+    async signOut(d) { chamadas.push({ operacao: 'sair', dados: d }); return { error: null }; },
+    async verifyOtp(d) { chamadas.push({ operacao: 'codigo', dados: d }); return { data: { session: sessao, user: identidade }, error: null }; },
     async getUser(token) {
       chamadas.push(token);
       return token === 'valido' ? { data: { user: identidade }, error: null }
@@ -29,31 +32,46 @@ function cenario(auth = {}, admin = {}) {
     ...auth
   } };
   const clienteAdmin = { auth: { admin: {
-    async createUser(d) { chamadasAdmin.push({ operacao: 'criar', dados: d }); return { data: { user: identidade }, error: null }; },
+    async generateLink(d) {
+      chamadasAdmin.push({ operacao: 'link', dados: d });
+      return { data: { user: identidade, properties: { hashed_token: `token-${d.type}`, verification_type: d.type } }, error: null };
+    },
     async deleteUser(id) { chamadasAdmin.push({ operacao: 'excluir', id }); return { data: {}, error: null }; },
     ...admin
   } } };
-  const servico = criarServicoAutenticacao(repositorio, () => cliente, () => clienteAdmin);
-  return { repositorio, servico, controlador: criarControladorAutenticacao(servico), chamadas, chamadasAdmin };
+  const servicoEmail = {
+    async enviarCodigo(d) { emails.push(d); },
+    ...email
+  };
+  const servico = criarServicoAutenticacao(repositorio, () => cliente, () => clienteAdmin, servicoEmail);
+  return { repositorio, servico, controlador: criarControladorAutenticacao(servico), chamadas, chamadasAdmin, emails };
 }
 
-test('cadastro confirma a conta no servidor e inicia a sessão sem enviar e-mail', async () => {
+test('cadastro envia código e só cria o perfil depois da confirmação', async () => {
   const c = cenario();
   const res = resposta();
   await c.controlador.cadastrar({ body: { ...dados, email: 'ALUNO@example.com', telefone: '+55 (11) 99999-9999' } }, res);
-  assert.equal(res.statusCode, 201);
-  assert.deepEqual(res.body, { sessao });
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.desafio.finalidade, 'cadastro');
+  assert.match(c.emails[0].codigo, /^[A-Z0-9]{5}$/);
+  assert.equal(c.repositorio.codigosVerificacao[0].codigo, undefined);
+  assert.notEqual(c.repositorio.codigosVerificacao[0].codigoHash, c.emails[0].codigo);
   assert.deepEqual(c.chamadasAdmin[0], {
-    operacao: 'criar',
+    operacao: 'link',
     dados: {
+      type: 'signup',
       email: dados.email,
       password: dados.senha,
-      email_confirm: true,
-      user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: 'America/Sao_Paulo' }
+      options: { data: { nome: dados.nome, telefone: dados.telefone, fusoHorario: 'America/Sao_Paulo' } }
     }
   });
-  assert.deepEqual(c.chamadas[0], { email: dados.email, password: dados.senha });
   assert.equal(c.repositorio.usuarios.length, 0);
+
+  const confirmacao = resposta();
+  await c.controlador.confirmarCodigo({ body: { desafioId: res.body.desafio.id, codigo: c.emails[0].codigo.toLowerCase() } }, confirmacao);
+  assert.deepEqual(confirmacao.body, { sessao });
+  assert.equal(c.repositorio.usuarios[0].id, identidade.id);
+  assert.equal(c.repositorio.usuarios[0].user_beta, 1);
 });
 
 test('valida os campos obrigatórios de cadastro antes de chamar o Auth', async () => {
@@ -64,21 +82,39 @@ test('valida os campos obrigatórios de cadastro antes de chamar o Auth', async 
   assert.equal(c.chamadasAdmin.length, 0);
 });
 
-test('login exige apenas e-mail e senha e devolve a sessão emitida pelo Supabase', async () => {
+test('login valida a senha e só devolve sessão depois do código', async () => {
   const c = cenario();
   const res = resposta();
   await c.controlador.entrar({ body: { email: dados.email, senha: dados.senha } }, res);
-  assert.deepEqual(c.chamadas[0], { email: dados.email, password: dados.senha });
-  assert.equal(res.body.sessao.access_token, 'jwt-do-supabase');
-  assert.equal(res.body.token, undefined);
+  assert.equal(res.statusCode, 202);
+  assert.equal(res.body.desafio.finalidade, 'entrada');
+  assert.deepEqual(c.chamadas[0], { operacao: 'senha', dados: { email: dados.email, password: dados.senha } });
+  assert.equal(res.body.sessao, undefined);
+
+  const confirmacao = resposta();
+  await c.controlador.confirmarCodigo({ body: { desafioId: res.body.desafio.id, codigo: c.emails[0].codigo } }, confirmacao);
+  assert.equal(confirmacao.body.sessao.access_token, 'jwt-do-supabase');
+  assert.ok(c.chamadas.some((item) => item.operacao === 'codigo' && item.dados.type === 'magiclink'));
 });
 
-test('remove a conta criada se o login imediato falhar', async () => {
-  const c = cenario({
-    signInWithPassword: async () => ({ data: {}, error: { status: 503 } })
+test('remove a identidade pendente quando o envio do código falha', async () => {
+  const c = cenario({}, {}, {
+    enviarCodigo: async () => { throw Object.assign(new Error('falha'), { statusCode: 503 }); }
   });
   await assert.rejects(() => c.servico.cadastrar(dados), { statusCode: 503 });
   assert.deepEqual(c.chamadasAdmin[1], { operacao: 'excluir', id: identidade.id });
+});
+
+test('bloqueia o desafio após cinco códigos incorretos', async () => {
+  const c = cenario();
+  const { desafio } = await c.servico.cadastrar(dados);
+  for (let tentativa = 1; tentativa <= 5; tentativa += 1) {
+    await assert.rejects(() => c.servico.confirmarCodigo({ desafioId: desafio.id, codigo: '00000' }), {
+      statusCode: tentativa === 5 ? 429 : 400
+    });
+  }
+  assert.ok((await c.repositorio.buscarCodigoVerificacao(desafio.id)).usadoEm);
+  assert.ok(c.chamadasAdmin.some((item) => item.operacao === 'excluir'));
 });
 
 test('traduz credenciais inválidas, e-mail não confirmado, limite e indisponibilidade', async () => {

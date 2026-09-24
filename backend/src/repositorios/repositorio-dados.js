@@ -26,6 +26,7 @@ class RepositorioMemoria {
     this.eventos = [];
     this.registros = [];
     this.materias = [];
+    this.codigosVerificacao = [];
   }
 
   async verificarConexao() { return true; }
@@ -44,6 +45,29 @@ class RepositorioMemoria {
     const usuario = { id: criarId('usr'), criadoEm: agora, atualizadoEm: agora, fusoHorario: 'America/Sao_Paulo', horarioLembretes: '07:27', preferenciaLembretesPerguntada: false, ...dados };
     this.usuarios.push(usuario);
     return usuario;
+  }
+  async criarCodigoVerificacao(dados) {
+    const item = { tentativas: 0, usadoEm: null, criadoEm: new Date(), ...dados, expiraEm: new Date(dados.expiraEm) };
+    this.codigosVerificacao.push(item);
+    return item;
+  }
+  async buscarCodigoVerificacao(id) { return this.codigosVerificacao.find((item) => item.id === id) || null; }
+  async buscarUltimoCodigoVerificacao(email, finalidade) {
+    return this.codigosVerificacao
+      .filter((item) => item.email === email && item.finalidade === finalidade && !item.usadoEm)
+      .sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm))[0] || null;
+  }
+  async atualizarCodigoVerificacao(id, dados) {
+    const item = await this.buscarCodigoVerificacao(id);
+    if (!item) return null;
+    Object.assign(item, dados);
+    return item;
+  }
+  async invalidarCodigosVerificacao(email, finalidade) {
+    const agora = new Date();
+    this.codigosVerificacao
+      .filter((item) => item.email === email && item.finalidade === finalidade && !item.usadoEm)
+      .forEach((item) => { item.usadoEm = agora; });
   }
 
   async listarTarefas(usuarioId, filtros = {}) {
@@ -195,6 +219,32 @@ class RepositorioSupabase {
   async criarUsuario(dados) {
     const agora = dataIso();
     return this.inserir('Usuario', { id: criarId('usr'), fusoHorario: 'America/Sao_Paulo', criadoEm: agora, atualizadoEm: agora, ...dados });
+  }
+  async criarCodigoVerificacao(dados) {
+    return this.inserir('CodigoVerificacaoEmail', {
+      tentativas: 0, usadoEm: null, criadoEm: dataIso(), ...dados, expiraEm: dataIso(dados.expiraEm)
+    });
+  }
+  async buscarCodigoVerificacao(id) { return this.buscarUm('CodigoVerificacaoEmail', { id }); }
+  async buscarUltimoCodigoVerificacao(email, finalidade) {
+    const { data } = await this.executar(this.criarCliente().from('CodigoVerificacaoEmail').select('*')
+      .eq('email', email).eq('finalidade', finalidade).is('usadoEm', null)
+      .order('criadoEm', { ascending: false }).limit(1).maybeSingle());
+    return data;
+  }
+  async atualizarCodigoVerificacao(id, dados) {
+    const campos = {
+      ...dados,
+      ...(dados.expiraEm ? { expiraEm: dataIso(dados.expiraEm) } : {}),
+      ...(dados.usadoEm ? { usadoEm: dataIso(dados.usadoEm) } : {})
+    };
+    const { data } = await this.executar(this.criarCliente().from('CodigoVerificacaoEmail')
+      .update(campos).eq('id', id).select().maybeSingle());
+    return data;
+  }
+  async invalidarCodigosVerificacao(email, finalidade) {
+    await this.executar(this.criarCliente().from('CodigoVerificacaoEmail')
+      .update({ usadoEm: dataIso() }).eq('email', email).eq('finalidade', finalidade).is('usadoEm', null));
   }
 
   async listarTarefas(usuarioId, filtros = {}) {

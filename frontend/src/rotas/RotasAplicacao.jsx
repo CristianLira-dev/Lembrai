@@ -3,6 +3,7 @@ import { useAutenticacao } from '../contextos/ContextoAutenticacao';
 import { PaginaLanding } from '../paginas/PaginaLanding';
 import { PaginaEntrada } from '../paginas/PaginaEntrada';
 import { PaginaCadastro } from '../paginas/PaginaCadastro';
+import { PaginaAuthCode } from '../paginas/PaginaAuthCode';
 import { PaginaPainel } from '../paginas/PaginaPainel';
 import { PaginaTarefas } from '../paginas/PaginaTarefas';
 import { PaginaNovaTarefa } from '../paginas/PaginaNovaTarefa';
@@ -32,6 +33,7 @@ export function RotasAplicacao() {
       <Route path="/entrar" element={<RotaPublica><PaginaEntrada /></RotaPublica>} />
       <Route path="/login" element={<RotaPublica><PaginaEntrada /></RotaPublica>} />
       <Route path="/cadastro" element={<RotaPublica><PaginaCadastro /></RotaPublica>} />
+      <Route path="/authcode" element={<RotaPublica><PaginaAuthCode /></RotaPublica>} />
       <Route element={<RotaPrivada />}>
         <Route element={<LayoutPrivado />}>
           <Route path="/painel" element={<PaginaPainel />} />

@@ -23,7 +23,7 @@ export function PaginaEntrada() {
     setEnviando(true);
     try {
       await entrar(dados);
-      navegar('/painel', { replace: true });
+      navegar('/authcode');
     } catch (erroApi) {
       setErro(erroApi.message);
     } finally {
@@ -98,7 +98,7 @@ export function PaginaEntrada() {
             </div>
 
             <button className="botao primario" disabled={enviando} type="submit">
-              {enviando ? 'Entrando...' : 'Entrar na Lembraí →'}
+              {enviando ? 'Enviando código...' : 'Continuar →'}
             </button>
           </form>
 

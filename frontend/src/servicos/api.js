@@ -9,6 +9,7 @@ const requisitar = criarClienteApi({
 export const api = {
   entrar: (dados) => requisitar('/autenticacao/entrar', { metodo: 'POST', dados, publico: true }),
   cadastrar: (dados) => requisitar('/autenticacao/cadastro', { metodo: 'POST', dados, publico: true }),
+  confirmarCodigo: (dados) => requisitar('/autenticacao/codigo/verificar', { metodo: 'POST', dados, publico: true }),
   eu: (token) => requisitar('/autenticacao/eu', { token }),
   resumo: () => requisitar('/painel/resumo'),
   tarefas: (params) => requisitar('/tarefas', { params }),

@@ -1,4 +1,5 @@
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const { criarAutenticador, validarSegredoWebhook } = require('../intermediarios/seguranca');
 const { criarServicoAutenticacao } = require('../servicos/servico-autenticacao');
 const { criarControladorAutenticacao } = require('../controladores/autenticacao-controlador');
@@ -17,10 +18,25 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   const lembretes = criarControladorLembretes(servicoLembretes);
   const webhook = criarControladorWebhook({ repositorio, filaMensagens, servicoAssistente });
   const painel = criarControladorPainel({ repositorio, servicoCalendarios });
+  const limiteInicioAuth = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { erro: 'Muitas solicitações de código. Aguarde alguns minutos e tente novamente.' }
+  });
+  const limiteCodigo = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    limit: 20,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { erro: 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' }
+  });
 
   rotas.use('/autenticacao', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
-  rotas.post('/autenticacao/cadastro', autenticacao.cadastrar);
-  rotas.post('/autenticacao/entrar', autenticacao.entrar);
+  rotas.post('/autenticacao/cadastro', limiteInicioAuth, autenticacao.cadastrar);
+  rotas.post('/autenticacao/entrar', limiteInicioAuth, autenticacao.entrar);
+  rotas.post('/autenticacao/codigo/verificar', limiteCodigo, autenticacao.confirmarCodigo);
   rotas.get('/autenticacao/eu', autenticar, autenticacao.eu);
 
   rotas.get('/tarefas', autenticar, tarefas.listar);
