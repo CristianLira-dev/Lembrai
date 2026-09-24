@@ -2558,6 +2558,44 @@ h3 {
     background: var(--ds-bg);
 }
 
+.beta-notice {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    max-width: 820px;
+    margin: 42px auto 0;
+    padding: 20px 22px;
+    border: 1px solid rgba(133, 219, 216, .34);
+    border-radius: 12px;
+    background: linear-gradient(135deg, rgba(133, 219, 216, .1), rgba(253, 53, 110, .05));
+}
+
+.beta-notice-icon {
+    display: grid;
+    flex: 0 0 40px;
+    width: 40px;
+    height: 40px;
+    place-items: center;
+    border: 1px solid rgba(133, 219, 216, .3);
+    border-radius: 10px;
+    background: rgba(133, 219, 216, .1);
+    color: var(--ds-mint);
+}
+
+.beta-notice strong {
+    display: block;
+    margin-bottom: 7px;
+    color: var(--ds-text);
+    font: 700 16px/1.35 'Aeonik Pro', 'Inter', sans-serif;
+}
+
+.beta-notice p {
+    margin: 0;
+    color: var(--ds-muted);
+    font-size: 14px;
+    line-height: 1.65;
+}
+
 .pricing-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -3277,6 +3315,10 @@ h3 {
         grid-template-columns: 1fr;
         margin-top: 48px;
     }
+    .beta-notice {
+        margin-top: 32px;
+        padding: 18px;
+    }
     .testimonials-section .landing-container {
         align-items: stretch;
     }
@@ -3376,6 +3418,18 @@ h3 {
     }
     .price-card {
         padding: 24px;
+    }
+    .beta-notice {
+        gap: 12px;
+        padding: 16px;
+    }
+    .beta-notice-icon {
+        flex-basis: 36px;
+        width: 36px;
+        height: 36px;
+    }
+    .beta-notice p {
+        font-size: 13px;
     }
 }
 
