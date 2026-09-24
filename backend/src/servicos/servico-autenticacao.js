@@ -1,10 +1,16 @@
+const crypto = require('node:crypto');
 const { createClient } = require('@supabase/supabase-js');
 const ambiente = require('../configuracao/ambiente');
 const { esquemaCadastro, validar } = require('../validadores/esquemas');
 const { removerSegredos } = require('../utilitarios/seguranca');
+const { ServicoEmail } = require('./servico-email');
 
-function falha(mensagem, statusCode) {
-  return Object.assign(new Error(mensagem), { statusCode });
+const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DURACAO_CODIGO_MS = 10 * 60 * 1000;
+const MAXIMO_TENTATIVAS = 5;
+
+function falha(mensagem, statusCode, codigo) {
+  return Object.assign(new Error(mensagem), { statusCode, ...(codigo ? { code: codigo } : {}) });
 }
 
 function criarClienteAuth() {
@@ -46,7 +52,37 @@ function traduzirErro(erro) {
   return falha(mensagens[erro.code] || 'Não foi possível autenticar. Verifique seus dados.', 400);
 }
 
-function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, criarClienteAdmin = criarClienteAuthAdmin) {
+function gerarCodigo() {
+  return Array.from({ length: 5 }, () => ALFABETO_CODIGO[crypto.randomInt(ALFABETO_CODIGO.length)]).join('');
+}
+
+function normalizarCodigo(codigo) {
+  return String(codigo || '').trim().toUpperCase();
+}
+
+function hashCodigo(desafioId, codigo) {
+  const segredo = ambiente.codigoVerificacaoSegredo || ambiente.jwtSegredo;
+  return crypto.createHmac('sha256', segredo).update(`${desafioId}:${normalizarCodigo(codigo)}`).digest('hex');
+}
+
+function hashesIguais(recebido, esperado) {
+  const a = Buffer.from(recebido || '', 'hex');
+  const b = Buffer.from(esperado || '', 'hex');
+  return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
+}
+
+function mascararEmail(email) {
+  const [usuario, dominio] = email.split('@');
+  const inicio = usuario.slice(0, Math.min(2, usuario.length));
+  return `${inicio}${'*'.repeat(Math.max(2, usuario.length - inicio.length))}@${dominio}`;
+}
+
+function criarServicoAutenticacao(
+  repositorio,
+  criarCliente = criarClienteAuth,
+  criarClienteAdmin = criarClienteAuthAdmin,
+  servicoEmail = new ServicoEmail()
+) {
   async function verificarToken(token) {
     // getUser consulta o Auth deste projeto e valida o JWT e sua expiração.
     const { data, error } = await criarCliente().auth.getUser(token);
@@ -92,38 +128,135 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, 
     }
   }
 
-  return {
-    verificarToken, obterPerfil,
-    async cadastrar(dados) {
-      if (await repositorio.buscarUsuarioPorEmail(dados.email)) throw falha('E-mail já cadastrado', 409);
-      if (await repositorio.buscarUsuarioPorTelefone(dados.telefone)) throw falha('WhatsApp já cadastrado', 409);
-      const clienteAdmin = criarClienteAdmin();
-      const { data: cadastro, error: erroCadastro } = await clienteAdmin.auth.admin.createUser({
-        email: dados.email,
-        password: dados.senha,
-        email_confirm: true,
-        user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario }
-      });
-      if (erroCadastro) throw traduzirErro(erroCadastro);
-
-      const { data: entrada, error: erroEntrada } = await criarCliente().auth.signInWithPassword({
-        email: dados.email,
-        password: dados.senha
-      });
-      if (erroEntrada || !entrada.session) {
-        // Evita deixar uma conta sem acesso se o login imediato falhar.
-        if (cadastro.user?.id) await clienteAdmin.auth.admin.deleteUser(cadastro.user.id).catch(() => {});
-        if (erroEntrada) throw traduzirErro(erroEntrada);
-        throw falha('Não foi possível iniciar sua sessão. Tente novamente.', 503);
-      }
-      return { sessao: entrada.session };
-    },
-    async entrar(dados) {
-      const { data, error } = await criarCliente().auth.signInWithPassword({ email: dados.email, password: dados.senha });
-      if (error) throw traduzirErro(error);
-      return { sessao: data.session };
+  async function criarDesafio({ email, nome, finalidade, tokenHash, tipoToken, usuarioAuthId }) {
+    await repositorio.invalidarCodigosVerificacao(email, finalidade);
+    const id = crypto.randomUUID();
+    const codigo = gerarCodigo();
+    const expiraEm = new Date(Date.now() + DURACAO_CODIGO_MS);
+    await repositorio.criarCodigoVerificacao({
+      id, email, finalidade, codigoHash: hashCodigo(id, codigo), tokenHash,
+      tipoToken, usuarioAuthId, expiraEm
+    });
+    try {
+      await servicoEmail.enviarCodigo({ email, nome, codigo, finalidade });
+    } catch (erro) {
+      await repositorio.atualizarCodigoVerificacao(id, { usadoEm: new Date() });
+      throw erro;
     }
-  };
+    return { id, email: mascararEmail(email), finalidade, expiraEm: expiraEm.toISOString() };
+  }
+
+  async function encerrarDesafio(desafio) {
+    await repositorio.atualizarCodigoVerificacao(desafio.id, { usadoEm: new Date() });
+    if (desafio.finalidade === 'cadastro' && desafio.usuarioAuthId) {
+      const perfil = await repositorio.buscarUsuarioPorId(desafio.usuarioAuthId);
+      if (!perfil) await criarClienteAdmin().auth.admin.deleteUser(desafio.usuarioAuthId).catch(() => {});
+    }
+  }
+
+  async function cadastrar(dados) {
+    if (await repositorio.buscarUsuarioPorEmail(dados.email)) throw falha('E-mail já cadastrado', 409);
+    if (await repositorio.buscarUsuarioPorTelefone(dados.telefone)) throw falha('WhatsApp já cadastrado', 409);
+    const clienteAdmin = criarClienteAdmin();
+    const anterior = await repositorio.buscarUltimoCodigoVerificacao(dados.email, 'cadastro');
+    if (anterior) {
+      await clienteAdmin.auth.admin.deleteUser(anterior.usuarioAuthId).catch(() => {});
+      await repositorio.invalidarCodigosVerificacao(dados.email, 'cadastro');
+    }
+
+    const { data, error } = await clienteAdmin.auth.admin.generateLink({
+      type: 'signup',
+      email: dados.email,
+      password: dados.senha,
+      options: { data: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario } }
+    });
+    if (error) throw traduzirErro(error);
+    if (!data.user?.id || !data.properties?.hashed_token) {
+      throw falha('Não foi possível preparar a confirmação do cadastro.', 503);
+    }
+
+    try {
+      const desafio = await criarDesafio({
+        email: dados.email, nome: dados.nome, finalidade: 'cadastro',
+        tokenHash: data.properties.hashed_token,
+        tipoToken: data.properties.verification_type,
+        usuarioAuthId: data.user.id
+      });
+      return { desafio };
+    } catch (erro) {
+      await clienteAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
+      throw erro;
+    }
+  }
+
+  async function entrar(dados) {
+    const cliente = criarCliente();
+    const { data: entrada, error: erroEntrada } = await cliente.auth.signInWithPassword({
+      email: dados.email, password: dados.senha
+    });
+    if (erroEntrada) throw traduzirErro(erroEntrada);
+    if (!entrada.user?.id || !entrada.session) throw falha('Não foi possível validar sua conta.', 503);
+    await cliente.auth.signOut({ scope: 'local' }).catch(() => {});
+
+    const perfil = await repositorio.buscarUsuarioPorId(entrada.user.id);
+    const { data, error } = await criarClienteAdmin().auth.admin.generateLink({
+      type: 'magiclink', email: dados.email
+    });
+    if (error) throw traduzirErro(error);
+    if (!data.properties?.hashed_token) throw falha('Não foi possível preparar a confirmação da entrada.', 503);
+
+    return { desafio: await criarDesafio({
+      email: dados.email,
+      nome: perfil?.nome || entrada.user.user_metadata?.nome,
+      finalidade: 'entrada',
+      tokenHash: data.properties.hashed_token,
+      tipoToken: data.properties.verification_type,
+      usuarioAuthId: entrada.user.id
+    }) };
+  }
+
+  async function confirmarCodigo({ desafioId, codigo }) {
+    const desafio = await repositorio.buscarCodigoVerificacao(desafioId);
+    if (!desafio || desafio.usadoEm) throw falha('Código inválido ou já utilizado.', 400);
+    if (new Date(desafio.expiraEm) <= new Date()) {
+      await encerrarDesafio(desafio);
+      throw falha('Código expirado. Volte e solicite um novo código.', 400);
+    }
+    if (desafio.tentativas >= MAXIMO_TENTATIVAS) {
+      await encerrarDesafio(desafio);
+      throw falha('Limite de tentativas atingido. Solicite um novo código.', 429);
+    }
+
+    const valido = hashesIguais(hashCodigo(desafio.id, codigo), desafio.codigoHash);
+    if (!valido) {
+      const tentativas = desafio.tentativas + 1;
+      await repositorio.atualizarCodigoVerificacao(desafio.id, {
+        tentativas,
+        ...(tentativas >= MAXIMO_TENTATIVAS ? { usadoEm: new Date() } : {})
+      });
+      if (tentativas >= MAXIMO_TENTATIVAS && desafio.finalidade === 'cadastro') {
+        await criarClienteAdmin().auth.admin.deleteUser(desafio.usuarioAuthId).catch(() => {});
+      }
+      throw falha(tentativas >= MAXIMO_TENTATIVAS
+        ? 'Limite de tentativas atingido. Solicite um novo código.'
+        : 'Código inválido. Confira os 5 caracteres e tente novamente.', tentativas >= MAXIMO_TENTATIVAS ? 429 : 400);
+    }
+
+    const { data, error } = await criarCliente().auth.verifyOtp({
+      token_hash: desafio.tokenHash,
+      type: desafio.tipoToken
+    });
+    if (error) {
+      await encerrarDesafio(desafio);
+      throw traduzirErro(error);
+    }
+    if (!data.session || !data.user) throw falha('Não foi possível iniciar sua sessão.', 503);
+    if (desafio.finalidade === 'cadastro') await obterPerfil(data.user);
+    await repositorio.atualizarCodigoVerificacao(desafio.id, { usadoEm: new Date() });
+    return { sessao: data.session };
+  }
+
+  return { verificarToken, obterPerfil, cadastrar, entrar, confirmarCodigo };
 }
 
 module.exports = { criarServicoAutenticacao };
