@@ -50,7 +50,7 @@ export function ProvedorAutenticacao({ children }) {
   useEffect(() => {
     localStorage.removeItem('assistente_token');
     if (!supabase) {
-      setErroSessao('Autenticação indisponível. Configure a conexão com o Supabase.');
+      setErroSessao('Não foi possível iniciar a autenticação. Tente novamente em instantes.');
       setCarregando(false);
       return;
     }

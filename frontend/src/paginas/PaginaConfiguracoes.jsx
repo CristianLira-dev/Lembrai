@@ -44,7 +44,7 @@ export function PaginaConfiguracoes() {
         <div className="campo"><label htmlFor="antecedencia">Antecedência padrão</label><select id="antecedencia" value={antecedencia} onChange={(evento) => setAntecedencia(evento.target.value)}><option>1 dia antes</option><option>2 dias antes</option><option>1 hora antes</option></select></div>
         <div className="acoes-formulario"><button className="botao primario" type="submit">Salvar preferências</button></div>
       </form>
-      <section className="cartao painel conta-configuracoes"><div className="painel-cabecalho"><div><p className="etiqueta">Sua conta</p><h2>Privacidade e dados</h2></div></div><p>A Lembraí usa suas preferências para organizar tarefas, calendários e lembretes. Você pode desconectar integrações a qualquer momento.</p><div className="status-conta"><span className="ponto-status conectado" /> Conta protegida por autenticação</div><button className="botao secundario" type="button" onClick={() => alert('A exportação de dados estará disponível em breve.')}>Exportar meus dados</button></section>
+      <section className="cartao painel conta-configuracoes"><div className="painel-cabecalho"><div><p className="etiqueta">Sua conta</p><h2>Privacidade e dados</h2></div></div><p>A Lembraí usa suas preferências para organizar tarefas, calendários e lembretes. Você pode desconectar integrações a qualquer momento.</p><div className="status-conta"><span className="ponto-status conectado" /> Conta protegida por autenticação</div></section>
     </div>
   </div>;
 }

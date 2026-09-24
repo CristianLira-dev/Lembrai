@@ -9,7 +9,7 @@ function falha(mensagem, statusCode) {
 
 function criarClienteAuth() {
   if (!ambiente.supabaseUrl || !ambiente.supabaseChavePublica) {
-    throw falha('Autenticação indisponível. Configure o Supabase no servidor.', 503);
+    throw falha('Não foi possível iniciar a autenticação. Tente novamente em instantes.', 503);
   }
   // Um cliente por operação: nunca compartilhe sessões entre requisições.
   return createClient(ambiente.supabaseUrl, ambiente.supabaseChavePublica, {
@@ -20,7 +20,7 @@ function criarClienteAuth() {
 
 function criarClienteAuthAdmin() {
   if (!ambiente.supabaseUrl || !ambiente.supabaseChaveSecreta) {
-    throw falha('Autenticação indisponível. Configure a chave secreta do Supabase no servidor.', 503);
+    throw falha('Não foi possível iniciar a autenticação. Tente novamente em instantes.', 503);
   }
   // Cliente administrativo exclusivo do backend. A chave secreta nunca vai para o navegador.
   return createClient(ambiente.supabaseUrl, ambiente.supabaseChaveSecreta, {
