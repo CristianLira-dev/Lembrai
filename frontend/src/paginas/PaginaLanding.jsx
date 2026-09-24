@@ -120,31 +120,519 @@ export function PaginaLanding() {
 
   return <div className="landing-page">
     <Header />
-    <main>
-      <section className="landing-hero" id="produto"><div className="landing-container hero-grid"><Reveal className="hero-copy"><p className="landing-eyebrow"><span className="eyebrow-pulse" /> Assistente acadêmico no WhatsApp</p><h1>Você fala.<br /><span>O assistente organiza.</span></h1><p className="hero-subtitle">Seu assistente acadêmico inteligente direto no WhatsApp. Organize tarefas, provas e trabalhos, conecte suas agendas e receba lembretes antes dos prazos.</p><div className="hero-actions"><Link className="landing-button primary" to="/cadastro">Começar agora <Icon name="arrow" size={16} /></Link><a className="landing-text-button" href="#como-funciona"><span className="play-icon"><Icon name="play" size={12} /></span> Ver como funciona</a></div><p className="hero-trust"><Icon name="check" size={13} /> Sem cartão de crédito para começar <span /> 1 mês grátis</p></Reveal><Reveal className="hero-visual"><div className="hero-orbit orbit-one" /><div className="hero-orbit orbit-two" /><div className="floating-tag calendar-tag"><span className="floating-icon mint"><Icon name="calendar" size={14} /></span><span><strong>Calendário</strong><small>sincronizado</small></span></div><div className="floating-tag ai-tag"><span className="floating-icon pink"><Icon name="spark" size={14} /></span><span><strong>IA</strong><small>entendeu</small></span></div><div className="floating-tag task-tag"><span className="floating-check"><Icon name="check" size={12} /></span><span><strong>Tarefa criada</strong><small>no prazo</small></span></div><PhoneMockup /></Reveal></div></section>
+   <main>
+  <section className="landing-hero" id="produto">
+    <div className="landing-container hero-grid">
+      <Reveal className="hero-copy">
+        <p className="landing-eyebrow">
+          <span className="eyebrow-pulse" /> Assistente acadêmico no WhatsApp
+        </p>
+        <h1>
+          Você fala.
+          <br />
+          <span>O assistente organiza.</span>
+        </h1>
+        <p className="hero-subtitle">
+          Seu assistente acadêmico inteligente direto no WhatsApp. Organize tarefas, provas e trabalhos, conecte suas agendas e receba lembretes antes dos prazos.
+        </p>
+        <div className="hero-actions">
+          <Link className="landing-button primary" to="/cadastro">
+            Começar agora <Icon name="arrow" size={16} />
+          </Link>
+          <a className="landing-text-button" href="#como-funciona">
+            <span className="play-icon">
+              <Icon name="play" size={12} />
+            </span>{" "}
+            Ver como funciona
+          </a>
+        </div>
+        <p className="hero-trust">
+          <Icon name="check" size={13} /> Sem cartão de crédito para começar <span /> 1 mês grátis
+        </p>
+      </Reveal>
+      <Reveal className="hero-visual">
+        <div className="hero-orbit orbit-one" />
+        <div className="hero-orbit orbit-two" />
+        <div className="floating-tag calendar-tag">
+          <span className="floating-icon mint">
+            <Icon name="calendar" size={14} />
+          </span>
+          <span>
+            <strong>Calendário</strong>
+            <small>sincronizado</small>
+          </span>
+        </div>
+        <div className="floating-tag ai-tag">
+          <span className="floating-icon pink">
+            <Icon name="spark" size={14} />
+          </span>
+          <span>
+            <strong>IA</strong>
+            <small>entendeu</small>
+          </span>
+        </div>
+        <div className="floating-tag task-tag">
+          <span className="floating-check">
+            <Icon name="check" size={12} />
+          </span>
+          <span>
+            <strong>Tarefa criada</strong>
+            <small>no prazo</small>
+          </span>
+        </div>
+        <PhoneMockup />
+      </Reveal>
+    </div>
+  </section>
 
-      <section className="credibility-section"><div className="landing-container credibility-inner"><p className="credibility-lead">Seu novo jeito de organizar<br /><span>a vida acadêmica.</span></p><div className="credibility-items"><div><span className="credibility-icon"><Icon name="chat" size={17} /></span><span><strong>WhatsApp</strong><small><Icon name="check" size={11} /> Integrado</small></span></div><div><span className="credibility-icon"><Icon name="calendar" size={17} /></span><span><strong>Calendários</strong><small>Google · Outlook · Apple</small></span></div><div><span className="credibility-icon"><Icon name="brain" size={17} /></span><span><strong>IA</strong><small><Icon name="check" size={11} /> Inteligente</small></span></div><div><span className="credibility-icon"><Icon name="bell" size={17} /></span><span><strong>Lembretes</strong><small><Icon name="check" size={11} /> Automáticos</small></span></div></div></div></section>
+  <section className="credibility-section">
+    <div className="landing-container credibility-inner">
+      <p className="credibility-lead">
+        Seu novo jeito de organizar
+        <br />
+        <span>a vida acadêmica.</span>
+      </p>
+      <div className="credibility-items">
+        <div>
+          <span className="credibility-icon">
+            <Icon name="chat" size={17} />
+          </span>
+          <span>
+            <strong>WhatsApp</strong>
+            <small>
+              <Icon name="check" size={11} /> Integrado
+            </small>
+          </span>
+        </div>
+        <div>
+          <span className="credibility-icon">
+            <Icon name="calendar" size={17} />
+          </span>
+          <span>
+            <strong>Calendários</strong>
+            <small>Google · Outlook · Apple</small>
+          </span>
+        </div>
+        <div>
+          <span className="credibility-icon">
+            <Icon name="brain" size={17} />
+          </span>
+          <span>
+            <strong>IA</strong>
+            <small>
+              <Icon name="check" size={11} /> Inteligente
+            </small>
+          </span>
+        </div>
+        <div>
+          <span className="credibility-icon">
+            <Icon name="bell" size={17} />
+          </span>
+          <span>
+            <strong>Lembretes</strong>
+            <small>
+              <Icon name="check" size={11} /> Automáticos
+            </small>
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
 
-      <section className="how-section landing-section" id="como-funciona"><div className="landing-container"><Reveal className="section-intro centered"><p className="landing-eyebrow">Como funciona</p><h2>Da mensagem à tranquilidade<br /><span>em quatro passos.</span></h2><p>Sem tutorial. Sem formulário longo. Só a conversa que você já teria.</p></Reveal><div className="steps-flow"><div className="steps-line" />{[['01', 'Fale', 'Mande uma mensagem pelo WhatsApp.', 'Tenho trabalho de programação para sexta.', 'chat'], ['02', 'O assistente entende', 'A inteligência identifica tarefa, matéria e prazo.', 'Trabalho · Programação · sexta', 'brain'], ['03', 'Organize', 'O evento é adicionado à sua agenda.', 'Evento adicionado', 'calendar'], ['04', 'Lembre', 'Você recebe um aviso antes do prazo.', 'Lembrete configurado', 'bell']].map(([numero, titulo, texto, destaque, icone], indice) => <Reveal className="step-item" key={numero}><span className="step-number">{numero}</span><span className="step-icon"><Icon name={icone} size={20} /></span><div><h3>{titulo}</h3><p>{texto}</p><code>{destaque}</code></div>{indice < 3 && <span className="step-arrow"><Icon name="arrow" size={15} /></span>}</Reveal>)}</div></div></section>
+  <section className="how-section landing-section" id="como-funciona">
+    <div className="landing-container">
+      <Reveal className="section-intro centered">
+        <p className="landing-eyebrow">Como funciona</p>
+        <h2>
+          Da mensagem à tranquilidade
+          <br />
+          <span>em quatro passos.</span>
+        </h2>
+        <p>Sem tutorial. Sem formulário longo. Só a conversa que você já teria.</p>
+      </Reveal>
+      <div className="steps-flow">
+        <div className="steps-line" />
+        {[
+          ['01', 'Fale', 'Mande uma mensagem pelo WhatsApp.', 'Tenho trabalho de programação para sexta.', 'chat'],
+          ['02', 'O assistente entende', 'A inteligência identifica tarefa, matéria e prazo.', 'Trabalho · Programação · sexta', 'brain'],
+          ['03', 'Organize', 'O evento é adicionado à sua agenda.', 'Evento adicionado', 'calendar'],
+          ['04', 'Lembre', 'Você recebe um aviso antes do prazo.', 'Lembrete configurado', 'bell']
+        ].map(([numero, titulo, texto, destaque, icone], indice) => (
+          <Reveal className="step-item" key={numero}>
+            <span className="step-number">{numero}</span>
+            <span className="step-icon">
+              <Icon name={icone} size={20} />
+            </span>
+            <div>
+              <h3>{titulo}</h3>
+              <p>{texto}</p>
+              <code>{destaque}</code>
+            </div>
+            {indice < 3 && (
+              <span className="step-arrow">
+                <Icon name="arrow" size={15} />
+              </span>
+            )}
+          </Reveal>
+        ))}
+      </div>
+    </div>
+  </section>
 
-      <section className="story-section" id="experiencia" ref={showcaseRef}><div className="landing-container story-grid"><div className="story-visual"><div className="story-sticky"><p className="landing-eyebrow">Veja acontecendo</p><PhoneMockup step={showcaseStep} compact /><div className="story-status"><span className="story-status-dot" /> {etapas[showcaseStep]}</div></div></div><div className="story-content"><p className="landing-eyebrow">Uma conversa que resolve</p><h2>Do “lembrei agora”<br /><span>ao “está resolvido”.</span></h2><p className="story-description">Role para acompanhar a conversa. O assistente transforma uma frase rápida em um compromisso que você pode confiar.</p><div className="story-steps">{etapas.map((etapa, indice) => <div className={`story-step ${showcaseStep === indice ? 'active' : ''}`} key={etapa}><span className="story-step-index">0{indice + 1}</span><div><strong>{etapa}</strong><p>{['“Tenho um trabalho de programação sexta.”', 'Data, matéria e intenção identificadas.', 'Conferindo seus calendários conectados.', 'Trabalho de Programação · sexta-feira.', 'Aviso programado para um dia antes.', '“Pronto. Eu te aviso antes do prazo.”'][indice]}</p></div></div>)}</div></div></div></section>
+  <section className="story-section" id="experiencia" ref={showcaseRef}>
+    <div className="landing-container story-grid">
+      <div className="story-visual">
+        <div className="story-sticky">
+          <p className="landing-eyebrow">Veja acontecendo</p>
+          <PhoneMockup step={showcaseStep} compact />
+          <div className="story-status">
+            <span className="story-status-dot" /> {etapas[showcaseStep]}
+          </div>
+        </div>
+      </div>
+      <div className="story-content">
+        <p className="landing-eyebrow">Uma conversa que resolve</p>
+        <h2>
+          Do “lembrei agora”
+          <br />
+          <span>ao “está resolvido”.</span>
+        </h2>
+        <p className="story-description">
+          Role para acompanhar a conversa. O assistente transforma uma frase rápida em um compromisso que você pode confiar.
+        </p>
+        <div className="story-steps">
+          {etapas.map((etapa, indice) => (
+            <div className={`story-step ${showcaseStep === indice ? 'active' : ''}`} key={etapa}>
+              <span className="story-step-index">0{indice + 1}</span>
+              <div>
+                <strong>{etapa}</strong>
+                <p>
+                  {[
+                    '“Tenho um trabalho de programação sexta.”',
+                    'Data, matéria e intenção identificadas.',
+                    'Conferindo seus calendários conectados.',
+                    'Trabalho de Programação · sexta-feira.',
+                    'Aviso programado para um dia antes.',
+                    '“Pronto. Eu te aviso antes do prazo.”'
+                  ][indice]}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
 
-      <section className="problem-section landing-section"><div className="landing-container problem-grid"><Reveal><p className="landing-eyebrow">O problema</p><h2>A faculdade não avisa<br /><span>quando você esquece.</span></h2></Reveal><Reveal className="problem-copy"><p>Você não precisa de mais um lugar para visitar. Precisa de um lugar que lembre por você.</p><div className="problem-quotes"><span>“Eu jurava que era semana que vem.”</span><span>“Esqueci completamente desse trabalho.”</span><span>“Onde eu anotei isso?”</span><span>“Tinha prova hoje?”</span></div><div className="solution-callout"><span className="solution-mark"><Icon name="spark" size={15} /></span><span><strong>A Lembraí transforma mensagens rápidas</strong><small>em compromissos organizados e lembretes automáticos.</small></span></div></Reveal></div></section>
+  <section className="problem-section landing-section">
+    <div className="landing-container problem-grid">
+      <Reveal>
+        <p className="landing-eyebrow">O problema</p>
+        <h2>
+          A faculdade não avisa
+          <br />
+          <span>quando você esquece.</span>
+        </h2>
+      </Reveal>
+      <Reveal className="problem-copy">
+        <p>Você não precisa de mais um lugar para visitar. Precisa de um lugar que lembre por você.</p>
+        <div className="problem-quotes">
+          <span>“Eu jurava que era semana que vem.”</span>
+          <span>“Esqueci completamente desse trabalho.”</span>
+          <span>“Onde eu anotei isso?”</span>
+          <span>“Tinha prova hoje?”</span>
+        </div>
+        <div className="solution-callout">
+          <span className="solution-mark">
+            <Icon name="spark" size={15} />
+          </span>
+          <span>
+            <strong>A Lembraí transforma mensagens rápidas</strong>
+            <small>em compromissos organizados e lembretes automáticos.</small>
+          </span>
+        </div>
+      </Reveal>
+    </div>
+  </section>
 
-      <section className="features-section landing-section" id="recursos"><div className="landing-container"><Reveal className="section-intro"><p className="landing-eyebrow">Tudo no mesmo lugar</p><h2>Feito para o ritmo<br /><span>da sua faculdade.</span></h2><p>Menos tempo organizando. Mais tempo vivendo o semestre.</p></Reveal><div className="features-grid">{recursos.map((recurso) => <Reveal className="feature-card" key={recurso.title}><span className="feature-icon"><Icon name={recurso.icon} size={20} /></span><h3>{recurso.title}</h3><p>{recurso.text}</p><span className="feature-arrow"><Icon name="arrow" size={15} /></span></Reveal>)}</div></div></section>
+  <section className="features-section landing-section" id="recursos">
+    <div className="landing-container">
+      <Reveal className="section-intro">
+        <p className="landing-eyebrow">Tudo no mesmo lugar</p>
+        <h2>
+          Feito para o ritmo
+          <br />
+          <span>da sua faculdade.</span>
+        </h2>
+        <p>Menos tempo organizando. Mais tempo vivendo o semestre.</p>
+      </Reveal>
+      <div className="features-grid">
+        {recursos.map((recurso) => (
+          <Reveal className="feature-card" key={recurso.title}>
+            <span className="feature-icon">
+              <Icon name={recurso.icon} size={20} />
+            </span>
+            <h3>{recurso.title}</h3>
+            <p>{recurso.text}</p>
+            <span className="feature-arrow">
+              <Icon name="arrow" size={15} />
+            </span>
+          </Reveal>
+        ))}
+      </div>
+    </div>
+  </section>
 
-      <section className="calendar-section landing-section"><div className="landing-container calendar-grid"><Reveal className="calendar-copy"><p className="landing-eyebrow">Calendários conectados</p><h2>Todas as suas agendas.<br /><span>Um único assistente.</span></h2><p>Seus compromissos ficam sincronizados para você não precisar conferir três lugares diferentes.</p><Link className="landing-text-button" to="/cadastro">Conectar meu calendário <Icon name="arrow" size={15} /></Link></Reveal><Reveal className="calendar-diagram"><div className="calendar-node top-node"><span className="provider-logo google">G</span><span>Google Calendar</span><span className="node-plus">+</span></div><div className="calendar-node"><span className="provider-logo outlook">O</span><span>Outlook Calendar</span><span className="node-plus">+</span></div><div className="calendar-node"><span className="provider-logo apple">A</span><span>Apple Calendar</span><span className="node-plus">+</span></div><div className="diagram-line"><span className="diagram-dot" /></div><div className="calendar-node assistant-node"><span className="assistant-node-icon"><Icon name="spark" size={16} /></span><span><strong>Lembraí</strong><small>organiza tudo</small></span></div><div className="diagram-line"><span className="diagram-dot" /></div><div className="calendar-result"><Icon name="check" size={16} /><span>Uma agenda organizada</span></div></Reveal></div></section>
+  <section className="calendar-section landing-section">
+    <div className="landing-container calendar-grid">
+      <Reveal className="calendar-copy">
+        <p className="landing-eyebrow">Calendários conectados</p>
+        <h2>
+          Todas as suas agendas.
+          <br />
+          <span>Um único assistente.</span>
+        </h2>
+        <p>Seus compromissos ficam sincronizados para você não precisar conferir três lugares diferentes.</p>
+        <Link className="landing-text-button" to="/cadastro">
+          Conectar meu calendário <Icon name="arrow" size={15} />
+        </Link>
+      </Reveal>
+      <Reveal className="calendar-diagram">
+        <div className="calendar-node top-node">
+          <span className="provider-logo google">G</span>
+          <span>Google Calendar</span>
+          <span className="node-plus">+</span>
+        </div>
+        <div className="calendar-node">
+          <span className="provider-logo outlook">O</span>
+          <span>Outlook Calendar</span>
+          <span className="node-plus">+</span>
+        </div>
+        <div className="calendar-node">
+          <span className="provider-logo apple">A</span>
+          <span>Apple Calendar</span>
+          <span className="node-plus">+</span>
+        </div>
+        <div className="diagram-line">
+          <span className="diagram-dot" />
+        </div>
+        <div className="calendar-node assistant-node">
+          <span className="assistant-node-icon">
+            <Icon name="spark" size={16} />
+          </span>
+          <span>
+            <strong>Lembraí</strong>
+            <small>organiza tudo</small>
+          </span>
+        </div>
+        <div className="diagram-line">
+          <span className="diagram-dot" />
+        </div>
+        <div className="calendar-result">
+          <Icon name="check" size={16} />
+          <span>Uma agenda organizada</span>
+        </div>
+      </Reveal>
+    </div>
+  </section>
 
-      <section className="ai-section landing-section"><div className="landing-container ai-grid"><Reveal className="ai-visual"><span className="ai-ring ring-one" /><span className="ai-ring ring-two" /><span className="ai-core"><Icon name="spark" size={35} /></span><span className="ai-chip chip-one">O que tenho amanhã?</span><span className="ai-chip chip-two">Me lembra dois dias antes.</span><span className="ai-chip chip-three">Muda minha prova para sexta.</span><span className="ai-chip chip-four">Quais tarefas estão atrasadas?</span></Reveal><Reveal className="ai-copy"><p className="landing-eyebrow">Inteligência sem esforço</p><h2>Você não precisa aprender<br /><span>a usar o assistente.</span></h2><p>É só conversar. A Lembraí entende o que você quis dizer e organiza o próximo passo.</p><div className="ai-quote"><span className="quote-mark">“</span><span>Escreva do jeito que você fala.<br /><strong>O assistente entende.</strong></span></div></Reveal></div></section>
+  <section className="ai-section landing-section">
+    <div className="landing-container ai-grid">
+      <Reveal className="ai-visual">
+        <span className="ai-ring ring-one" />
+        <span className="ai-ring ring-two" />
+        <span className="ai-core">
+          <Icon name="spark" size={35} />
+        </span>
+        <span className="ai-chip chip-one">O que tenho amanhã?</span>
+        <span className="ai-chip chip-two">Me lembra dois dias antes.</span>
+        <span className="ai-chip chip-three">Muda minha prova para sexta.</span>
+        <span className="ai-chip chip-four">Quais tarefas estão atrasadas?</span>
+      </Reveal>
+      <Reveal className="ai-copy">
+        <p className="landing-eyebrow">Inteligência sem esforço</p>
+        <h2>
+          Você não precisa aprender
+          <br />
+          <span>a usar o assistente.</span>
+        </h2>
+        <p>É só conversar. A Lembraí entende o que você quis dizer e organiza o próximo passo.</p>
+        <div className="ai-quote">
+          <span className="quote-mark">“</span>
+          <span>
+            Escreva do jeito que você fala.
+            <br />
+            <strong>O assistente entende.</strong>
+          </span>
+        </div>
+      </Reveal>
+    </div>
+  </section>
 
-      <section className="benefits-section landing-section"><div className="landing-container"><Reveal className="section-intro centered"><p className="landing-eyebrow">O que muda</p><h2>Mais espaço para<br /><span>o que importa.</span></h2></Reveal><div className="benefits-row"><Reveal className="benefit-item"><strong>Menos</strong><span>esquecimentos.</span></Reveal><Reveal className="benefit-item accent"><strong>Mais</strong><span>organização.</span></Reveal><Reveal className="benefit-item"><strong>Mais</strong><span>tempo.</span></Reveal><Reveal className="benefit-item"><strong>Mais</strong><span>tranquilidade.</span></Reveal></div></div></section>
+  <section className="benefits-section landing-section">
+    <div className="landing-container">
+      <Reveal className="section-intro centered">
+        <p className="landing-eyebrow">O que muda</p>
+        <h2>
+          Mais espaço para
+          <br />
+          <span>o que importa.</span>
+        </h2>
+      </Reveal>
+      <div className="benefits-row">
+        <Reveal className="benefit-item">
+          <strong>Menos</strong>
+          <span>esquecimentos.</span>
+        </Reveal>
+        <Reveal className="benefit-item accent">
+          <strong>Mais</strong>
+          <span>organização.</span>
+        </Reveal>
+        <Reveal className="benefit-item">
+          <strong>Mais</strong>
+          <span>tempo.</span>
+        </Reveal>
+        <Reveal className="benefit-item">
+          <strong>Mais</strong>
+          <span>tranquilidade.</span>
+        </Reveal>
+      </div>
+    </div>
+  </section>
 
-      <section className="pricing-section landing-section" id="precos"><div className="landing-container"><Reveal className="section-intro centered"><p className="landing-eyebrow">Planos simples</p><h2>Comece sem pensar<br /><span>demais.</span></h2><p>Um mês para sentir a diferença. Depois, você decide.</p></Reveal><Reveal className="beta-notice"><span className="beta-notice-icon"><Icon name="spark" size={19} /></span><div><strong>Fase beta com acesso gratuito</strong><p>A Lembraí ainda está em desenvolvimento e disponível gratuitamente durante a fase de testes. Nas próximas atualizações, os planos pagos serão liberados, e os usuários beta receberão benefícios e descontos exclusivos na versão paga.</p></div></Reveal><div className="pricing-grid"><Reveal className="price-card"><p className="price-label">Plano 01</p><h3>Grátis</h3><p className="price-description">Experimente o assistente gratuitamente por 1 mês.</p><div className="price-value"><strong>R$ 0</strong><span>no primeiro mês</span></div><p className="price-note">1 mês grátis. Depois, R$ 9,99/mês.</p><Link className="landing-button secondary full" to="/cadastro">Começar grátis <Icon name="arrow" size={15} /></Link><ul><li><Icon name="check" size={14} /> Assistente pelo WhatsApp</li><li><Icon name="check" size={14} /> Tarefas e lembretes</li><li><Icon name="check" size={14} /> Dashboard completo</li></ul></Reveal><Reveal className="price-card featured"><span className="price-ribbon">Mais completo</span><p className="price-label">Plano 02</p><h3>Pro</h3><p className="price-description">Tudo o que você precisa para nunca mais perder um prazo.</p><div className="price-value"><strong>R$ 9,99</strong><span>/mês</span></div><p className="price-note">Comece gratuitamente por 1 mês.</p><Link className="landing-button primary full" to="/cadastro">Assinar plano Pro <Icon name="arrow" size={15} /></Link><ul><li><Icon name="check" size={14} /> Assistente pelo WhatsApp</li><li><Icon name="check" size={14} /> Tarefas ilimitadas</li><li><Icon name="check" size={14} /> Calendários integrados</li><li><Icon name="check" size={14} /> Sincronização e recursos avançados</li></ul></Reveal></div></div></section>
+  <section className="pricing-section landing-section" id="precos">
+    <div className="landing-container">
+      <Reveal className="section-intro centered">
+        <p className="landing-eyebrow">Planos simples</p>
+        <h2>
+          Comece sem pensar
+          <br />
+          <span>demais.</span>
+        </h2>
+        <p>Um mês para sentir a diferença. Depois, você decide.</p>
+      </Reveal>
+      <Reveal className="beta-notice">
+        <span className="beta-notice-icon">
+          <Icon name="spark" size={19} />
+        </span>
+        <div>
+          <strong>Fase beta com acesso gratuito</strong>
+          <p>
+            A Lembraí ainda está em desenvolvimento e disponível gratuitamente durante a fase de testes. Nas próximas atualizações, os planos pagos serão liberados, e os usuários beta receberão benefícios e descontos exclusivos na versão paga.
+          </p>
+        </div>
+      </Reveal>
+      <div className="pricing-grid">
+        <Reveal className="price-card">
+          <p className="price-label">Plano 01</p>
+          <h3>Grátis</h3>
+          <p className="price-description">Experimente o assistente gratuitamente por 1 mês.</p>
+          <div className="price-value">
+            <strong>R$ 0</strong>
+            <span>no primeiro mês</span>
+          </div>
+          <p className="price-note">1 mês grátis. Depois, R$ 9,99/mês.</p>
+          <Link className="landing-button secondary full" to="/cadastro">
+            Começar grátis <Icon name="arrow" size={15} />
+          </Link>
+          <ul>
+            <li>
+              <Icon name="check" size={14} /> Assistente pelo WhatsApp
+            </li>
+            <li>
+              <Icon name="check" size={14} /> Tarefas e lembretes
+            </li>
+            <li>
+              <Icon name="check" size={14} /> Dashboard completo
+            </li>
+          </ul>
+        </Reveal>
+        <Reveal className="price-card featured">
+          <span className="price-ribbon">Mais completo</span>
+          <p className="price-label">Plano 02</p>
+          <h3>Pro</h3>
+          <p className="price-description">Tudo o que você precisa para nunca mais perder um prazo.</p>
+          <div className="price-value">
+            <strong>R$ 19,99</strong>
+            <span>/mês</span>
+          </div>
+          <p className="price-note">Comece gratuitamente por 1 mês.</p>
+          <Link className="landing-button primary full" to="/cadastro">
+            Assinar plano Pro <Icon name="arrow" size={15} />
+          </Link>
+          <ul>
+            <li>
+              <Icon name="check" size={14} /> Assistente pelo WhatsApp
+            </li>
+            <li>
+              <Icon name="check" size={14} /> Tarefas ilimitadas
+            </li>
+            <li>
+              <Icon name="check" size={14} /> Calendários integrados
+            </li>
+            <li>
+              <Icon name="check" size={14} /> Sincronização e recursos avançados
+            </li>
+          </ul>
+        </Reveal>
+      </div>
+    </div>
+  </section>
 
-      <section className="faq-section landing-section" id="faq"><div className="landing-container faq-grid"><Reveal className="faq-intro"><p className="landing-eyebrow">Perguntas frequentes</p><h2>O que você quer<br /><span>saber primeiro?</span></h2><p>Confira as principais informações sobre a Lembraí.</p></Reveal><Reveal className="faq-list">{perguntas.map(([pergunta, resposta], indice) => <div className={`faq-item ${faqAberto === indice ? 'open' : ''}`} key={pergunta}><button type="button" onClick={() => setFaqAberto(faqAberto === indice ? -1 : indice)} aria-expanded={faqAberto === indice}><span>{pergunta}</span><span className="faq-toggle"><Icon name={faqAberto === indice ? 'minus' : 'plus'} size={14} /></span></button>{faqAberto === indice && <p>{resposta}</p>}</div>)}</Reveal></div></section>
+  <section className="faq-section landing-section" id="faq">
+    <div className="landing-container faq-grid">
+      <Reveal className="faq-intro">
+        <p className="landing-eyebrow">Perguntas frequentes</p>
+        <h2>
+          O que você quer
+          <br />
+          <span>saber primeiro?</span>
+        </h2>
+        <p>Confira as principais informações sobre a Lembraí.</p>
+      </Reveal>
+      <Reveal className="faq-list">
+        {perguntas.map(([pergunta, resposta], indice) => (
+          <div className={`faq-item ${faqAberto === indice ? 'open' : ''}`} key={pergunta}>
+            <button
+              type="button"
+              onClick={() => setFaqAberto(faqAberto === indice ? -1 : indice)}
+              aria-expanded={faqAberto === indice}
+            >
+              <span>{pergunta}</span>
+              <span className="faq-toggle">
+                <Icon name={faqAberto === indice ? 'minus' : 'plus'} size={14} />
+              </span>
+            </button>
+            {faqAberto === indice && <p>{resposta}</p>}
+          </div>
+        ))}
+      </Reveal>
+    </div>
+  </section>
 
-      <section className="final-cta-section"><div className="landing-container final-cta-inner"><div className="final-cta-copy"><p className="landing-eyebrow">Seu próximo semestre começa aqui</p><h2>Pare de lembrar<br /><span>das tarefas.</span></h2><p>Deixe o assistente lembrar por você.</p><Link className="landing-button primary" to="/cadastro">Começar gratuitamente <Icon name="arrow" size={16} /></Link><small>1 mês grátis. Depois R$ 9,99/mês.</small></div><div className="final-cta-visual"><PhoneMockup compact /><span className="final-orbit orbit-a" /><span className="final-orbit orbit-b" /></div></div></section>
-    </main>
+  <section className="final-cta-section">
+    <div className="landing-container final-cta-inner">
+      <div className="final-cta-copy">
+        <p className="landing-eyebrow">Seu próximo semestre começa aqui</p>
+        <h2>
+          Pare de lembrar
+          <br />
+          <span>das tarefas.</span>
+        </h2>
+        <p>Deixe o assistente lembrar por você.</p>
+        <Link className="landing-button primary" to="/cadastro">
+          Começar gratuitamente <Icon name="arrow" size={16} />
+        </Link>
+        <small>1 mês grátis. Depois R$ 9,99/mês.</small>
+      </div>
+      <div className="final-cta-visual">
+        <PhoneMockup compact />
+        <span className="final-orbit orbit-a" />
+        <span className="final-orbit orbit-b" />
+      </div>
+    </div>
+  </section>
+</main>
     <footer className="landing-footer"><div className="landing-container"><div className="footer-main"><div className="footer-brand"><LogoPlaceholder /><p>Seu assistente acadêmico<br />direto no WhatsApp.</p></div><div className="footer-links"><div><strong>Produto</strong><a href="#como-funciona">Como funciona</a><a href="#recursos">Recursos</a><a href="#precos">Preços</a><a href="#faq">FAQ</a></div><div><strong>Acesso</strong><Link to="/entrada">Entrar</Link><Link to="/cadastro">Criar conta</Link></div></div></div><div className="footer-bottom"><span>© 2026 Lembraí. Todos os direitos reservados.</span><span>Feito para quem tem coisa demais para lembrar.</span></div></div></footer>
   </div>;
 }
