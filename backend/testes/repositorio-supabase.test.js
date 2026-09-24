@@ -10,6 +10,7 @@ function clienteFake(resultado = { data: [], error: null, count: 0 }) {
     update(dados) { chamadas.push(['update', dados]); return this; },
     delete() { chamadas.push(['delete']); return this; },
     eq(...args) { chamadas.push(['eq', ...args]); return this; },
+    is(...args) { chamadas.push(['is', ...args]); return this; },
     gte(...args) { chamadas.push(['gte', ...args]); return this; },
     lt(...args) { chamadas.push(['lt', ...args]); return this; },
     lte(...args) { chamadas.push(['lte', ...args]); return this; },
