@@ -25,6 +25,11 @@ const esquemaEntrada = z.object({
   senha: z.string().min(1).max(128)
 });
 
+const esquemaConfirmarCodigo = z.object({
+  desafioId: z.string().uuid(),
+  codigo: z.string().trim().toUpperCase().regex(/^[A-Z0-9]{5}$/, 'Informe o código de 5 caracteres')
+});
+
 const tiposTarefa = ['tarefa', 'prova', 'trabalho', 'aula', 'compromisso', 'outro'];
 const prioridades = ['baixa', 'media', 'alta'];
 const statusTarefa = ['pendente', 'concluida', 'cancelada'];
@@ -92,6 +97,7 @@ module.exports = {
   esquemaTelefone,
   esquemaCadastro,
   esquemaEntrada,
+  esquemaConfirmarCodigo,
   esquemaCriarTarefa,
   esquemaAtualizarTarefa,
   esquemaCriarLembrete,
