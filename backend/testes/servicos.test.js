@@ -6,7 +6,7 @@ const assert = require('node:assert/strict');
 const { RepositorioMemoria } = require('../src/repositorios/repositorio-dados');
 const { ServicoCalendarios } = require('../src/servicos/servico-calendarios');
 const { ServicoTarefas, calcularAgendamento } = require('../src/servicos/servico-tarefas');
-const { ServicoLembretes } = require('../src/servicos/servico-lembretes');
+const { ServicoLembretes, MENSAGEM_INATIVIDADE } = require('../src/servicos/servico-lembretes');
 const { ServicoAssistente, SEM_CONTA, FORA_ESCOPO } = require('../src/servicos/servico-assistente');
 const { normalizarTelefone } = require('../src/utilitarios/telefone');
 
@@ -90,6 +90,27 @@ test('antecipa o agendamento antigo de dois dias e envia o resumo diário penden
   );
 });
 
+test('avisa uma vez após 14 dias sem cadastro e rearma após nova atividade', async () => {
+  const cenario = criarCenario();
+  const usuario = await criarUsuario(cenario);
+  const lembretes = new ServicoLembretes({ repositorio: cenario.repositorio, servicoWhatsapp: cenario.whatsapp });
+  const agora = new Date();
+  await cenario.repositorio.atualizarUsuario(usuario.id, {
+    ultimaAtividadeRegistradaEm: new Date(agora.getTime() - 15 * 24 * 60 * 60 * 1000),
+    ultimoAvisoInatividadeEm: null
+  });
+
+  assert.deepEqual(await lembretes.processarUsuariosInativos(agora), { enviados: 1, falhos: 0 });
+  assert.equal(cenario.mensagens[0].texto, MENSAGEM_INATIVIDADE);
+  assert.deepEqual(await lembretes.processarUsuariosInativos(new Date(agora.getTime() + 60_000)), { enviados: 0, falhos: 0 });
+
+  await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+  const atualizado = await cenario.repositorio.buscarUsuarioPorId(usuario.id);
+  assert.equal(atualizado.ultimoAvisoInatividadeEm, null);
+  assert.ok(new Date(atualizado.ultimaAtividadeRegistradaEm) > new Date(agora.getTime() - 60_000));
+  assert.deepEqual(await lembretes.processarUsuariosInativos(new Date(agora.getTime() + 24 * 60 * 60 * 1000)), { enviados: 0, falhos: 0 });
+});
+
 test('normaliza cadastro brasileiro para o formato entregue pela Evolution', () => {
   assert.equal(normalizarTelefone('(11) 99999-9999'), '5511999999999');
   assert.equal(normalizarTelefone('5511999999999@s.whatsapp.net'), '5511999999999');
@@ -169,10 +190,14 @@ test('edição altera a atividade somente depois da confirmação', async () => 
   const usuario = await criarUsuario(cenario);
   const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
 
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'muda o trabalho de redes para 22/10', identificadorExterno: 'e-1' });
+  const lista = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'muda o trabalho de redes para 22/10', identificadorExterno: 'e-1' });
+  assert.match(lista.resposta, /1\. .*Trabalho de Redes/);
+  const proposta = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: '1', identificadorExterno: 'e-2' });
+  assert.match(proposta.resposta, /Vou alterar.*22\/10\/2027.*Confirma/);
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-20');
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode alterar', identificadorExterno: 'e-2' });
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode alterar', identificadorExterno: 'e-3' });
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-22');
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 1);
 });
 
 test('fallback local reconhece edição de data', async () => {
@@ -184,8 +209,10 @@ test('fallback local reconhece edição de data', async () => {
   const proposta = await cenario.assistente.processarEntrada({
     telefone: usuario.telefone, texto: 'mude o trabalho de redes para 22/10/2027', identificadorExterno: 'fe-1'
   });
-  assert.match(proposta.resposta, /Vou alterar.*Trabalho de Redes.*22\/10\/2027.*Confirma/);
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode alterar', identificadorExterno: 'fe-2' });
+  assert.match(proposta.resposta, /Qual atividade você quer editar.*1\. .*Trabalho de Redes/s);
+  const confirmacao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: '1', identificadorExterno: 'fe-2' });
+  assert.match(confirmacao.resposta, /Vou alterar.*Trabalho de Redes.*22\/10\/2027.*Confirma/);
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'pode alterar', identificadorExterno: 'fe-3' });
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-22');
 });
 
@@ -196,11 +223,37 @@ test('fallback local coleta o campo que será editado em duas mensagens', async 
   const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
 
   const escolha = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'editar trabalho de redes', identificadorExterno: 'fec-1' });
-  assert.match(escolha.resposta, /O que você quer mudar/);
-  const mudanca = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'matéria para Banco de Dados', identificadorExterno: 'fec-2' });
+  assert.match(escolha.resposta, /Qual atividade você quer editar.*1\. .*Trabalho de Redes/s);
+  const selecionada = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: '1', identificadorExterno: 'fec-2' });
+  assert.match(selecionada.resposta, /Você escolheu:.*Trabalho de Redes.*O que você quer mudar/s);
+  const mudanca = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'matéria para Banco de Dados', identificadorExterno: 'fec-3' });
   assert.match(mudanca.resposta, /Vou alterar.*Banco De Dados.*Confirma/);
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'fec-3' });
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'fec-4' });
   assert.equal((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).materia, 'Banco De Dados');
+});
+
+test('edição numera as tarefas e atualiza somente a opção escolhida', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+  const primeira = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
+  const segunda = await cenario.tarefas.criar(usuario.id, {
+    title: 'Prova de Algoritmos', subject: 'Algoritmos', type: 'exam',
+    dueDate: '2027-10-21', dueTime: '20:00'
+  }, { sincronizarCalendario: false });
+
+  const lista = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'editar atividade', identificadorExterno: 'enum-1' });
+  assert.match(lista.resposta, /1\. .*Trabalho de Redes/);
+  assert.match(lista.resposta, /2\. .*Prova de Algoritmos/);
+  const selecionada = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: '2', identificadorExterno: 'enum-2' });
+  assert.match(selecionada.resposta, /Você escolheu:.*Prova de Algoritmos/s);
+  const alteracao = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'nome para Prova Final', identificadorExterno: 'enum-3' });
+  assert.match(alteracao.resposta, /Vou alterar.*Prova Final.*Confirma/s);
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'enum-4' });
+
+  assert.equal((await cenario.tarefas.obter(usuario.id, primeira.tarefa.id)).titulo, 'Trabalho de Redes');
+  assert.equal((await cenario.tarefas.obter(usuario.id, segunda.tarefa.id)).titulo, 'Prova Final');
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 2);
 });
 
 test('remoção exige confirmação e exclui somente a atividade escolhida', async () => {
@@ -267,11 +320,12 @@ test('gíria ambígua não confirma edição pendente', async () => {
   const criada = await cenario.tarefas.criar(usuario.id, atividade.task, { sincronizarCalendario: false });
 
   await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'muda o trabalho de redes para 22/10', identificadorExterno: 'giria-edicao-1' });
-  const resposta = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'blz', identificadorExterno: 'giria-edicao-2' });
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: '1', identificadorExterno: 'giria-edicao-2' });
+  const resposta = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'blz', identificadorExterno: 'giria-edicao-3' });
 
   assert.match(resposta.resposta, /edição ainda aguarda confirmação/);
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-20');
-  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'giria-edicao-3' });
+  await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'sim', identificadorExterno: 'giria-edicao-4' });
   assert.equal(new Date((await cenario.tarefas.obter(usuario.id, criada.tarefa.id)).dataEntrega).toISOString().slice(0, 10), '2027-10-22');
 });
 

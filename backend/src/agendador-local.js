@@ -14,6 +14,7 @@ function iniciarAgendadorLocal({ servicoLembretes, intervaloMs = 30_000 }) {
         }
       }
       await servicoLembretes.processarResumosPendentes(new Date());
+      await servicoLembretes.processarUsuariosInativos(new Date());
     } catch (erro) {
       console.error('[Agendador] Falha ao consultar lembretes:', erro.message);
     } finally {

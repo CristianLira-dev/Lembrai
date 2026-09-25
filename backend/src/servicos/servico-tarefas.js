@@ -61,6 +61,12 @@ class ServicoTarefas {
       dataEntrega, horarioEntrega: dados.dueTime || dados.horarioEntrega || null,
       duracao: dados.duracao || dados.duration || null, prioridade: mapaPrioridade[dados.prioridade || dados.priority] || 'media'
     });
+    if (!existente) {
+      await this.repositorio.atualizarUsuario(usuarioId, {
+        ultimaAtividadeRegistradaEm: tarefa.criadoEm || new Date(),
+        ultimoAvisoInatividadeEm: null
+      });
+    }
     let lembreteAgendado = false;
     const avisos = [];
     try {

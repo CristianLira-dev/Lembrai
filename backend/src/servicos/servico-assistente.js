@@ -147,7 +147,22 @@ class ServicoAssistente {
       resposta = 'Vou mudar os lembretes para ' + acao.reminderTime + ', no seu fuso horário. Confirma?';
     } else if (['complete_task', 'edit_task', 'delete_task'].includes(acao.intent)) {
       const tarefas = await this.servicoTarefas.listar(usuario.id, { status: 'pendente' });
-      if (proposta.reference && anterior?.reference && normalizado(proposta.reference) !== normalizado(anterior.reference)) acao.targetId = null;
+      if (acao.intent === 'edit_task' && !acao.targetId) {
+        if (!tarefas.length) {
+          await this.guardar(conversa, null);
+          return 'Você não tem atividades pendentes para editar.';
+        }
+        const opcoes = tarefas.slice(0, 12);
+        acao.stage = 'select';
+        acao.options = opcoes.map((tarefa) => tarefa.id);
+        resposta = 'Qual atividade você quer editar?\n'
+          + opcoes.map((tarefa, indice) => (indice + 1) + '. ' + resumo(tarefaDoBanco(tarefa, usuario.fusoHorario))).join('\n')
+          + '\nEnvie o número da atividade.';
+        if (tarefas.length > 12) resposta += '\nMostrei as 12 mais próximas do prazo.';
+        await this.guardar(conversa, acao);
+        return resposta;
+      }
+      if (acao.intent !== 'edit_task' && proposta.reference && anterior?.reference && normalizado(proposta.reference) !== normalizado(anterior.reference)) acao.targetId = null;
       let alvo = acao.targetId ? tarefas.find((t) => t.id === acao.targetId) : null;
       if (!alvo && acao.reference) {
         const palavras = normalizado(acao.reference).split(/\W+/).filter((p) => p && !['o', 'a', 'os', 'as', 'de', 'da', 'do', 'em', 'atividade'].includes(p));
@@ -182,6 +197,8 @@ class ServicoAssistente {
           if (Object.keys(mudancas).length && nova.title && nova.subject && dataValida(nova.dueDate) && (!nova.dueTime || horarioValido(nova.dueTime))) {
             acao.stage = 'confirm';
             resposta = 'Vou alterar ' + '*' + limpo(atual.title) + '*' + ' para: ' + resumo(nova) + '. Confirma?';
+          } else {
+            resposta = 'Você escolheu: ' + resumo(atual) + '.\nO que você quer mudar: nome, data, horário ou matéria?';
           }
         }
       }
@@ -343,10 +360,13 @@ class ServicoAssistente {
           };
         }
         const proposta = propostaSchema.safeParse(interpretacao);
+        const propostaAtual = proposta.success && pendente?.intent === 'edit_task' && proposta.data.intent === 'create_task'
+          ? { ...proposta.data, intent: 'edit_task', reference: null }
+          : proposta.success ? proposta.data : null;
         if (interpretacao.intent === 'unavailable') resposta = FALHA;
-        else if (!proposta.success || proposta.data.intent === 'unknown') resposta = FORA_ESCOPO;
-        else if (CONSULTAS.includes(proposta.data.intent)) resposta = await this.consultar(usuario, conversa, proposta.data.intent, new Date(recebidoEm));
-        else resposta = await this.preparar(usuario, conversa, proposta.data, pendente);
+        else if (!propostaAtual || propostaAtual.intent === 'unknown') resposta = FORA_ESCOPO;
+        else if (CONSULTAS.includes(propostaAtual.intent)) resposta = await this.consultar(usuario, conversa, propostaAtual.intent, new Date(recebidoEm));
+        else resposta = await this.preparar(usuario, conversa, propostaAtual, pendente);
       }
     } catch { resposta = FALHA; }
     await this.repositorio.atualizarMensagem(mensagem.id, { statusProcessamento: 'processado', metadados: { generation: interpretacao?.generation || null, response: resposta } });

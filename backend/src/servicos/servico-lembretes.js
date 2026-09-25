@@ -1,5 +1,8 @@
 const { formatarResumoPendencias, proximoResumoDiario, proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
 
+const MENSAGEM_INATIVIDADE = 'Estamos sentindo sua falta… 😢 continue registrando suas atividades para não perder tarefas importantes';
+const DIAS_INATIVIDADE = 14;
+
 class ServicoLembretes {
   constructor({ repositorio, servicoWhatsapp }) {
     this.repositorio = repositorio;
@@ -60,6 +63,24 @@ class ServicoLembretes {
     return resultado;
   }
 
+  async processarUsuariosInativos(agora = new Date()) {
+    const limite = new Date(agora.getTime() - DIAS_INATIVIDADE * 24 * 60 * 60 * 1000);
+    const usuarios = await this.repositorio.listarUsuariosInativos(limite);
+    const resultado = { enviados: 0, falhos: 0 };
+
+    for (const usuario of usuarios) {
+      try {
+        await this.servicoWhatsapp.enviarResposta(usuario.telefone, MENSAGEM_INATIVIDADE);
+        await this.repositorio.atualizarUsuario(usuario.id, { ultimoAvisoInatividadeEm: agora });
+        resultado.enviados += 1;
+      } catch {
+        resultado.falhos += 1;
+      }
+    }
+
+    return resultado;
+  }
+
   async processar(lembreteId) {
     const lembrete = await this.repositorio.buscarLembretePorId?.(lembreteId) || null;
     if (!lembrete) return { ignorado: true, motivo: 'lembrete_nao_encontrado' };
@@ -83,4 +104,4 @@ class ServicoLembretes {
   }
 }
 
-module.exports = { ServicoLembretes };
+module.exports = { ServicoLembretes, MENSAGEM_INATIVIDADE, DIAS_INATIVIDADE };
