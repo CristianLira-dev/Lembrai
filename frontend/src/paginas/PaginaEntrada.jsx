@@ -103,8 +103,7 @@ export function PaginaEntrada() {
           </form>
 
           <p className="link-autenticacao">
-            <Link to="/recuperar-senha">Esqueci minha senha</Link> ·{' '}
-            <Link to="/confirmar-email">Confirmar meu e-mail</Link>
+            <Link to="/recuperar-senha">Esqueci minha senha</Link>
           </p>
 
           <p className="link-autenticacao">
