@@ -21,6 +21,16 @@ module.exports = {
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseChavePublica: process.env.SUPABASE_PUBLISHABLE_KEY || '',
   supabaseChaveSecreta: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  codigoVerificacaoSegredo: process.env.CODIGO_VERIFICACAO_SEGREDO || process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+  smtp: {
+    host: process.env.SMTP_HOST || '',
+    porta: Number(process.env.SMTP_PORT || 587),
+    seguro: process.env.SMTP_SEGURO === 'true' || process.env.SMTP_PORT === '465',
+    usuario: process.env.SMTP_USUARIO || '',
+    senha: process.env.SMTP_SENHA || '',
+    remetente: process.env.EMAIL_REMETENTE || process.env.SMTP_USUARIO || '',
+    nomeRemetente: process.env.EMAIL_NOME_REMETENTE || 'Lembraí'
+  },
   jwtSegredo: process.env.JWT_SEGREDO || 'desenvolvimento-troque-este-segredo',
   jwtExpiracao: process.env.JWT_EXPIRACAO || '7d',
   urlChatbot: process.env.URL_CHATBOT || 'http://localhost:8000',

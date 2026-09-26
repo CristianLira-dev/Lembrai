@@ -23,7 +23,7 @@ export function PaginaEntrada() {
     setEnviando(true);
     try {
       await entrar(dados);
-      navegar('/painel', { replace: true });
+      navegar('/authcode', { replace: true });
     } catch (erroApi) {
       setErro(erroApi.message);
     } finally {
@@ -101,6 +101,11 @@ export function PaginaEntrada() {
               {enviando ? 'Entrando...' : 'Entrar na Lembraí →'}
             </button>
           </form>
+
+          <p className="link-autenticacao">
+            <Link to="/recuperar-senha">Esqueci minha senha</Link> ·{' '}
+            <Link to="/confirmar-email">Confirmar meu e-mail</Link>
+          </p>
 
           <p className="link-autenticacao">
             Ainda não tem uma conta? <Link to="/cadastro">Criar meu espaço</Link>

@@ -3,6 +3,23 @@ import { api } from '../servicos/api';
 import { exigirSupabase, supabase } from '../servicos/supabase';
 
 const ContextoAutenticacao = createContext(null);
+const CHAVE_DESAFIO = 'lembrai_desafio_autenticacao';
+
+function salvarDesafio(desafio) {
+  sessionStorage.setItem(CHAVE_DESAFIO, JSON.stringify(desafio));
+  return desafio;
+}
+
+function obterDesafioPendente() {
+  try {
+    return JSON.parse(sessionStorage.getItem(CHAVE_DESAFIO)) || null;
+  } catch {
+    sessionStorage.removeItem(CHAVE_DESAFIO);
+    return null;
+  }
+}
+
+function limparDesafio() { sessionStorage.removeItem(CHAVE_DESAFIO); }
 
 export function ProvedorAutenticacao({ children }) {
   const [usuario, setUsuario] = useState(null);
@@ -82,25 +99,56 @@ export function ProvedorAutenticacao({ children }) {
     exigirSupabase();
     setErroSessao('');
     const resposta = await api.entrar(dados);
-    await aceitarSessao(resposta.data.sessao);
+    return salvarDesafio(resposta.data.desafio);
   }
 
   async function cadastrar(dados) {
     exigirSupabase();
     setErroSessao('');
     const resposta = await api.cadastrar(dados);
+    return salvarDesafio(resposta.data.desafio);
+  }
+
+  async function confirmarCodigo(codigo) {
+    exigirSupabase();
+    setErroSessao('');
+    const desafio = obterDesafioPendente();
+    if (!desafio?.id) throw new Error('Solicite um novo código para continuar.');
+    const resposta = await api.confirmarCodigo({ desafioId: desafio.id, codigo });
+    limparDesafio();
     await aceitarSessao(resposta.data.sessao);
+  }
+
+  async function solicitarRecuperacao(email) {
+    const resposta = await api.solicitarRecuperacao({ email });
+    return salvarDesafio(resposta.data.desafio);
+  }
+
+  async function redefinirSenha(codigo, novaSenha) {
+    const desafio = obterDesafioPendente();
+    if (!desafio?.id || desafio.finalidade !== 'recuperacao') throw new Error('Solicite um novo código para continuar.');
+    const resposta = await api.redefinirSenha({ desafioId: desafio.id, codigo, novaSenha });
+    limparDesafio();
+    return resposta.data;
+  }
+
+  async function reenviarConfirmacao(email) {
+    const resposta = await api.reenviarConfirmacao({ email });
+    return salvarDesafio(resposta.data.desafio);
   }
 
   async function sair() {
     const { error } = await exigirSupabase().auth.signOut({ scope: 'local' });
     if (error) throw new Error('Não foi possível encerrar a sessão. Tente novamente.');
     await sincronizarSessao(null);
+    limparDesafio();
     setErroSessao('');
   }
 
   const valor = useMemo(() => ({
-    usuario, carregando, erroSessao, autenticado: Boolean(usuario), entrar, cadastrar, sair
+    usuario, carregando, erroSessao, autenticado: Boolean(usuario),
+    entrar, cadastrar, confirmarCodigo, solicitarRecuperacao, redefinirSenha,
+    reenviarConfirmacao, obterDesafioPendente, limparDesafio, sair
   }), [usuario, carregando, erroSessao]);
   return <ContextoAutenticacao.Provider value={valor}>{children}</ContextoAutenticacao.Provider>;
 }

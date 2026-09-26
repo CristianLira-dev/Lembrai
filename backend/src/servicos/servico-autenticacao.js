@@ -1,17 +1,22 @@
+const crypto = require('node:crypto');
 const { createClient } = require('@supabase/supabase-js');
 const ambiente = require('../configuracao/ambiente');
 const { esquemaCadastro, validar } = require('../validadores/esquemas');
 const { removerSegredos } = require('../utilitarios/seguranca');
+const { ServicoEmail } = require('./servico-email');
 
-function falha(mensagem, statusCode) {
-  return Object.assign(new Error(mensagem), { statusCode });
+const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const DURACAO_CODIGO_MS = 10 * 60 * 1000;
+const MAXIMO_TENTATIVAS = 5;
+
+function falha(mensagem, statusCode, codigo) {
+  return Object.assign(new Error(mensagem), { statusCode, ...(codigo ? { code: codigo } : {}) });
 }
 
 function criarClienteAuth() {
   if (!ambiente.supabaseUrl || !ambiente.supabaseChavePublica) {
     throw falha('Não foi possível iniciar a autenticação. Tente novamente em instantes.', 503);
   }
-  // Um cliente por operação: nunca compartilhe sessões entre requisições.
   return createClient(ambiente.supabaseUrl, ambiente.supabaseChavePublica, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { fetch: (url, opcoes) => fetch(url, { ...opcoes, signal: AbortSignal.timeout(10000) }) }
@@ -22,7 +27,6 @@ function criarClienteAuthAdmin() {
   if (!ambiente.supabaseUrl || !ambiente.supabaseChaveSecreta) {
     throw falha('Não foi possível iniciar a autenticação. Tente novamente em instantes.', 503);
   }
-  // Cliente administrativo exclusivo do backend. A chave secreta nunca vai para o navegador.
   return createClient(ambiente.supabaseUrl, ambiente.supabaseChaveSecreta, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     global: { fetch: (url, opcoes) => fetch(url, { ...opcoes, signal: AbortSignal.timeout(10000) }) }
@@ -32,7 +36,7 @@ function criarClienteAuthAdmin() {
 function traduzirErro(erro) {
   const mensagens = {
     invalid_credentials: 'E-mail ou senha inválidos',
-    email_not_confirmed: 'Confirme seu e-mail antes de entrar.',
+    email_not_confirmed: 'Confirme seu e-mail antes de entrar. Você pode solicitar um novo código.',
     user_already_exists: 'Não foi possível cadastrar esta conta. Tente entrar.',
     email_exists: 'Não foi possível cadastrar esta conta. Tente entrar.',
     weak_password: 'Escolha uma senha mais forte, com pelo menos 8 caracteres.',
@@ -43,12 +47,39 @@ function traduzirErro(erro) {
   };
   if (erro.status === 429) return falha('Muitas tentativas. Aguarde um pouco e tente novamente.', 429);
   if (!erro.status || erro.status >= 500) return falha('Não foi possível conectar à autenticação. Tente novamente.', 503);
-  return falha(mensagens[erro.code] || 'Não foi possível autenticar. Verifique seus dados.', 400);
+  return falha(mensagens[erro.code] || 'Não foi possível autenticar. Verifique seus dados.', 400, erro.code);
 }
 
-function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, criarClienteAdmin = criarClienteAuthAdmin) {
+function gerarCodigo() {
+  return Array.from({ length: 5 }, () => ALFABETO_CODIGO[crypto.randomInt(ALFABETO_CODIGO.length)]).join('');
+}
+
+function normalizarCodigo(codigo) { return String(codigo || '').trim().toUpperCase(); }
+
+function hashCodigo(desafioId, codigo) {
+  const segredo = ambiente.codigoVerificacaoSegredo || ambiente.jwtSegredo;
+  return crypto.createHmac('sha256', segredo).update(`${desafioId}:${normalizarCodigo(codigo)}`).digest('hex');
+}
+
+function hashesIguais(recebido, esperado) {
+  const a = Buffer.from(recebido || '', 'hex');
+  const b = Buffer.from(esperado || '', 'hex');
+  return a.length === b.length && a.length > 0 && crypto.timingSafeEqual(a, b);
+}
+
+function mascararEmail(email) {
+  const [usuario, dominio] = String(email).split('@');
+  const inicio = usuario.slice(0, Math.min(2, usuario.length));
+  return `${inicio}${'*'.repeat(Math.max(2, usuario.length - inicio.length))}@${dominio}`;
+}
+
+function criarServicoAutenticacao(
+  repositorio,
+  criarCliente = criarClienteAuth,
+  criarClienteAdmin = criarClienteAuthAdmin,
+  servicoEmail = new ServicoEmail()
+) {
   async function verificarToken(token) {
-    // getUser consulta o Auth deste projeto e valida o JWT e sua expiração.
     const { data, error } = await criarCliente().auth.getUser(token);
     if (error) {
       if (!error.status || error.status >= 500 || error.status === 429) throw traduzirErro(error);
@@ -63,7 +94,6 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, 
   async function obterPerfil(usuarioAuth) {
     const existente = await repositorio.buscarUsuarioPorId(usuarioAuth.id);
     if (existente) return removerSegredos(existente);
-    // Metadata contém somente perfil, nunca identidade ou permissões.
     const perfil = validar(esquemaCadastro.omit({ senha: true }), {
       nome: usuarioAuth.user_metadata?.nome,
       telefone: usuarioAuth.user_metadata?.telefone,
@@ -78,9 +108,7 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, 
     }
     try {
       return removerSegredos(await repositorio.criarUsuario({
-        ...perfil, id: usuarioAuth.id,
-        // Campo legado obrigatório no schema. Não é senha nem hash utilizável.
-        senhaCriptografada: '!supabase-auth'
+        ...perfil, id: usuarioAuth.id, senhaCriptografada: '!supabase-auth'
       }));
     } catch (erro) {
       if (erro.code === '23505') {
@@ -92,37 +120,160 @@ function criarServicoAutenticacao(repositorio, criarCliente = criarClienteAuth, 
     }
   }
 
-  return {
-    verificarToken, obterPerfil,
-    async cadastrar(dados) {
-      if (await repositorio.buscarUsuarioPorEmail(dados.email)) throw falha('E-mail já cadastrado', 409);
-      if (await repositorio.buscarUsuarioPorTelefone(dados.telefone)) throw falha('WhatsApp já cadastrado', 409);
-      const clienteAdmin = criarClienteAdmin();
-      const { data: cadastro, error: erroCadastro } = await clienteAdmin.auth.admin.createUser({
-        email: dados.email,
-        password: dados.senha,
-        email_confirm: true,
-        user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario }
-      });
-      if (erroCadastro) throw traduzirErro(erroCadastro);
-
-      const { data: entrada, error: erroEntrada } = await criarCliente().auth.signInWithPassword({
-        email: dados.email,
-        password: dados.senha
-      });
-      if (erroEntrada || !entrada.session) {
-        // Evita deixar uma conta sem acesso se o login imediato falhar.
-        if (cadastro.user?.id) await clienteAdmin.auth.admin.deleteUser(cadastro.user.id).catch(() => {});
-        if (erroEntrada) throw traduzirErro(erroEntrada);
-        throw falha('Não foi possível iniciar sua sessão. Tente novamente.', 503);
-      }
-      return { sessao: entrada.session };
-    },
-    async entrar(dados) {
-      const { data, error } = await criarCliente().auth.signInWithPassword({ email: dados.email, password: dados.senha });
-      if (error) throw traduzirErro(error);
-      return { sessao: data.session };
+  async function criarDesafio({ email, nome, finalidade, usuarioAuthId }) {
+    await repositorio.invalidarCodigosVerificacao(email, finalidade);
+    const id = crypto.randomUUID();
+    const codigo = gerarCodigo();
+    const expiraEm = new Date(Date.now() + DURACAO_CODIGO_MS);
+    await repositorio.criarCodigoVerificacao({
+      id, email, finalidade, codigoHash: hashCodigo(id, codigo), tokenHash: '',
+      tipoToken: 'codigo_email_personalizado', usuarioAuthId, expiraEm
+    });
+    try {
+      await servicoEmail.enviarCodigo({ email, nome, codigo, finalidade });
+    } catch (erro) {
+      await repositorio.atualizarCodigoVerificacao(id, { usadoEm: new Date() });
+      throw erro;
     }
+    return { id, email: mascararEmail(email), finalidade, expiraEm: expiraEm.toISOString() };
+  }
+
+  function criarDesafioFalso(email, finalidade) {
+    return {
+      id: crypto.randomUUID(), email: mascararEmail(email), finalidade,
+      expiraEm: new Date(Date.now() + DURACAO_CODIGO_MS).toISOString()
+    };
+  }
+
+  async function validarCodigo(desafioId, codigo, finalidadeEsperada) {
+    const desafio = await repositorio.buscarCodigoVerificacao(desafioId);
+    if (!desafio || desafio.usadoEm || desafio.finalidade !== finalidadeEsperada) {
+      throw falha('Código inválido ou já utilizado.', 400);
+    }
+    if (new Date(desafio.expiraEm) <= new Date()) {
+      await repositorio.atualizarCodigoVerificacao(desafio.id, { usadoEm: new Date() });
+      throw falha('Código expirado. Solicite um novo código.', 400);
+    }
+    if (desafio.tentativas >= MAXIMO_TENTATIVAS) {
+      await repositorio.atualizarCodigoVerificacao(desafio.id, { usadoEm: new Date() });
+      throw falha('Limite de tentativas atingido. Solicite um novo código.', 429);
+    }
+    if (!hashesIguais(hashCodigo(desafio.id, codigo), desafio.codigoHash)) {
+      const tentativas = desafio.tentativas + 1;
+      await repositorio.atualizarCodigoVerificacao(desafio.id, {
+        tentativas, ...(tentativas >= MAXIMO_TENTATIVAS ? { usadoEm: new Date() } : {})
+      });
+      throw falha(
+        tentativas >= MAXIMO_TENTATIVAS
+          ? 'Limite de tentativas atingido. Solicite um novo código.'
+          : 'Código inválido. Confira os 5 caracteres e tente novamente.',
+        tentativas >= MAXIMO_TENTATIVAS ? 429 : 400
+      );
+    }
+    const consumido = await repositorio.consumirCodigoVerificacao(desafio.id);
+    if (!consumido) throw falha('Código inválido ou já utilizado.', 400);
+    return consumido;
+  }
+
+  async function criarSessao(email) {
+    const { data: link, error: erroLink } = await criarClienteAdmin().auth.admin.generateLink({ type: 'magiclink', email });
+    if (erroLink) throw traduzirErro(erroLink);
+    if (!link.properties?.hashed_token) throw falha('Não foi possível iniciar sua sessão.', 503);
+    const { data, error } = await criarCliente().auth.verifyOtp({
+      token_hash: link.properties.hashed_token,
+      type: link.properties.verification_type || 'magiclink'
+    });
+    if (error) throw traduzirErro(error);
+    if (!data.session || !data.user) throw falha('Não foi possível iniciar sua sessão.', 503);
+    return data;
+  }
+
+  async function cadastrar(dados) {
+    if (await repositorio.buscarUsuarioPorEmail(dados.email)) throw falha('E-mail já cadastrado', 409);
+    if (await repositorio.buscarUsuarioPorTelefone(dados.telefone)) throw falha('WhatsApp já cadastrado', 409);
+    const clienteAdmin = criarClienteAdmin();
+    const anterior = await repositorio.buscarUltimoCodigoVerificacao(dados.email, 'cadastro', true);
+    if (anterior?.usuarioAuthId) {
+      const { data } = await clienteAdmin.auth.admin.getUserById(anterior.usuarioAuthId);
+      if (data?.user?.email_confirmed_at) throw falha('E-mail já cadastrado', 409);
+      await clienteAdmin.auth.admin.deleteUser(anterior.usuarioAuthId).catch(() => {});
+      await repositorio.invalidarCodigosVerificacao(dados.email, 'cadastro');
+    }
+    const { data, error } = await clienteAdmin.auth.admin.createUser({
+      email: dados.email,
+      password: dados.senha,
+      email_confirm: false,
+      user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario }
+    });
+    if (error) throw traduzirErro(error);
+    if (!data.user?.id) throw falha('Não foi possível preparar a confirmação do cadastro.', 503);
+    try {
+      return { desafio: await criarDesafio({
+        email: dados.email, nome: dados.nome, finalidade: 'cadastro', usuarioAuthId: data.user.id
+      }) };
+    } catch (erro) {
+      await clienteAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
+      throw erro;
+    }
+  }
+
+  async function entrar(dados) {
+    const cliente = criarCliente();
+    const { data, error } = await cliente.auth.signInWithPassword({ email: dados.email, password: dados.senha });
+    if (error) throw traduzirErro(error);
+    if (!data.user?.id || !data.session) throw falha('Não foi possível validar sua conta.', 503);
+    await cliente.auth.signOut({ scope: 'local' }).catch(() => {});
+    const perfil = await repositorio.buscarUsuarioPorId(data.user.id);
+    return { desafio: await criarDesafio({
+      email: dados.email, nome: perfil?.nome || data.user.user_metadata?.nome,
+      finalidade: 'entrada', usuarioAuthId: data.user.id
+    }) };
+  }
+
+  async function confirmarCodigo({ desafioId, codigo }) {
+    const inicial = await repositorio.buscarCodigoVerificacao(desafioId);
+    const finalidade = inicial?.finalidade;
+    if (!['cadastro', 'entrada'].includes(finalidade)) throw falha('Código inválido ou já utilizado.', 400);
+    const desafio = await validarCodigo(desafioId, codigo, finalidade);
+    if (finalidade === 'cadastro') {
+      const { data, error } = await criarClienteAdmin().auth.admin.updateUserById(desafio.usuarioAuthId, { email_confirm: true });
+      if (error) throw traduzirErro(error);
+      if (!data.user) throw falha('Não foi possível confirmar seu e-mail.', 503);
+    }
+    const autenticacao = await criarSessao(desafio.email);
+    if (finalidade === 'cadastro') await obterPerfil(autenticacao.user);
+    return { sessao: autenticacao.session };
+  }
+
+  async function solicitarRecuperacao({ email }) {
+    const perfil = await repositorio.buscarUsuarioPorEmail(email);
+    if (!perfil) return { desafio: criarDesafioFalso(email, 'recuperacao') };
+    return { desafio: await criarDesafio({
+      email, nome: perfil.nome, finalidade: 'recuperacao', usuarioAuthId: perfil.id
+    }) };
+  }
+
+  async function redefinirSenha({ desafioId, codigo, novaSenha }) {
+    const desafio = await validarCodigo(desafioId, codigo, 'recuperacao');
+    const { error } = await criarClienteAdmin().auth.admin.updateUserById(desafio.usuarioAuthId, { password: novaSenha });
+    if (error) throw traduzirErro(error);
+    return { mensagem: 'Senha alterada com sucesso. Entre usando sua nova senha.' };
+  }
+
+  async function reenviarConfirmacao({ email }) {
+    if (await repositorio.buscarUsuarioPorEmail(email)) return { desafio: criarDesafioFalso(email, 'cadastro') };
+    const anterior = await repositorio.buscarUltimoCodigoVerificacao(email, 'cadastro', true);
+    if (!anterior?.usuarioAuthId) return { desafio: criarDesafioFalso(email, 'cadastro') };
+    const { data, error } = await criarClienteAdmin().auth.admin.getUserById(anterior.usuarioAuthId);
+    if (error || !data.user || data.user.email_confirmed_at) return { desafio: criarDesafioFalso(email, 'cadastro') };
+    return { desafio: await criarDesafio({
+      email, nome: data.user.user_metadata?.nome, finalidade: 'cadastro', usuarioAuthId: data.user.id
+    }) };
+  }
+
+  return {
+    verificarToken, obterPerfil, cadastrar, entrar, confirmarCodigo,
+    solicitarRecuperacao, redefinirSenha, reenviarConfirmacao
   };
 }
 

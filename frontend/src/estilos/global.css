@@ -4114,6 +4114,29 @@ h3 {
     color: var(--app-pink);
 }
 
+.authcode-input {
+    min-height: 64px;
+    text-align: center;
+    font: 700 28px/1 'Fira Code', monospace;
+    letter-spacing: .32em;
+    text-transform: uppercase;
+}
+
+.authcode-ajuda {
+    display: block;
+    margin-top: 8px;
+    color: var(--app-muted);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.authcode-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+}
+
 .filtro-barra {
     margin-bottom: 17px;
 }
