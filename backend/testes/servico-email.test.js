@@ -37,3 +37,13 @@ test('falha com resposta segura quando SMTP não está configurado', async () =>
     (erro) => erro.statusCode === 503 && erro.code === 'SMTP_NAO_CONFIGURADO'
   );
 });
+
+test('falha quando o servidor SMTP rejeita todos os destinatários', async () => {
+  const servico = new ServicoEmail(smtp, () => ({
+    sendMail: async () => ({ accepted: [], rejected: ['aluno@example.com'] })
+  }));
+  await assert.rejects(
+    () => servico.enviarCodigo({ email: 'aluno@example.com', codigo: 'A7K2P', finalidade: 'recuperacao' }),
+    (erro) => erro.statusCode === 503 && erro.code === 'SMTP_ENVIO_FALHOU'
+  );
+});

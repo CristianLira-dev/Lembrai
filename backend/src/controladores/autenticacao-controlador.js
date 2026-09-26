@@ -24,7 +24,7 @@ function criarControladorAutenticacao(servicoAutenticacao) {
     },
     solicitarRecuperacao: async (req, res) => {
       const dados = validar(esquemaSolicitarRecuperacao, req.body);
-      return res.status(202).json(await servicoAutenticacao.solicitarRecuperacao(dados));
+      return res.status(200).json(await servicoAutenticacao.solicitarRecuperacao(dados));
     },
     redefinirSenha: async (req, res) => {
       const dados = validar(esquemaRedefinirSenha, req.body);
@@ -32,7 +32,7 @@ function criarControladorAutenticacao(servicoAutenticacao) {
     },
     reenviarConfirmacao: async (req, res) => {
       const dados = validar(esquemaReenviarConfirmacao, req.body);
-      return res.status(202).json(await servicoAutenticacao.reenviarConfirmacao(dados));
+      return res.status(200).json(await servicoAutenticacao.reenviarConfirmacao(dados));
     },
     eu: async (req, res) => res.json({ usuario: req.perfil })
   };

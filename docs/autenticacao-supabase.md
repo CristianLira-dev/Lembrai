@@ -34,6 +34,8 @@ A chave publicável pode ser usada no navegador. A chave secreta acessa a Data A
 
 No Render, cadastre essas variáveis exclusivamente no serviço do backend. A porta `465` usa `SMTP_SEGURO=true`; as portas `587` e `2525` normalmente usam `false` e iniciam TLS durante a conexão. Nunca exponha a senha SMTP em variáveis `VITE_`.
 
+> **Render Free:** as portas SMTP `25`, `465` e `587` são bloqueadas. Nesse plano, o Gmail SMTP termina em timeout mesmo com a senha de app correta. Para manter o Nodemailer, use um provedor que ofereça a porta `2525`; como alternativas, use uma API de e-mail por HTTPS ou um serviço pago do Render.
+
 ## Fluxos de código
 
 - Cadastro: cria a identidade ainda não confirmada, envia o código e confirma o e-mail somente após a validação.

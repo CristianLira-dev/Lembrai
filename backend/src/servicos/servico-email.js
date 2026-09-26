@@ -70,7 +70,7 @@ class ServicoEmail {
     const codigoSeguro = escaparHtml(codigo);
     const remetente = this.configuracao;
     try {
-      await this.obterTransporte().sendMail({
+      const resultado = await this.obterTransporte().sendMail({
         from: { name: remetente.nomeRemetente || 'Lembraí', address: remetente.remetente },
         to: email,
         subject: conteudo.assunto,
@@ -86,6 +86,11 @@ class ServicoEmail {
             </div>
           </body></html>`
       });
+      if (Array.isArray(resultado?.rejected) && resultado.rejected.length > 0
+        && (!Array.isArray(resultado.accepted) || resultado.accepted.length === 0)) {
+        throw falhaEmail('Não foi possível enviar o código por e-mail. Tente novamente em instantes.', 'SMTP_DESTINATARIO_REJEITADO');
+      }
+      return { messageId: resultado?.messageId || null };
     } catch (erro) {
       if (erro?.code === 'SMTP_NAO_CONFIGURADO') throw erro;
       throw falhaEmail('Não foi possível enviar o código por e-mail. Tente novamente em instantes.', 'SMTP_ENVIO_FALHOU');

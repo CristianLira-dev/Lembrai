@@ -36,6 +36,10 @@ function cenario(auth = {}, admin = {}) {
     async createUser(d) { chamadasAdmin.push({ operacao: 'criar', dados: d }); return { data: { user: usuarioAdmin }, error: null }; },
     async deleteUser(id) { chamadasAdmin.push({ operacao: 'excluir', id }); return { data: {}, error: null }; },
     async getUserById(id) { chamadasAdmin.push({ operacao: 'buscar', id }); return { data: { user: usuarioAdmin }, error: null }; },
+    async listUsers(d) {
+      chamadasAdmin.push({ operacao: 'listar', dados: d });
+      return { data: { users: [identidade], nextPage: null }, error: null };
+    },
     async updateUserById(id, d) {
       chamadasAdmin.push({ operacao: 'atualizar', id, dados: d });
       usuarioAdmin = { ...usuarioAdmin, ...(d.email_confirm ? { email_confirmed_at: new Date().toISOString() } : {}) };
@@ -120,6 +124,47 @@ test('recuperação valida o código antes de alterar a senha', async () => {
   });
   assert.match(respostaRecuperacao.mensagem, /Senha alterada/);
   assert.ok(c.chamadasAdmin.some((item) => item.operacao === 'atualizar' && item.dados.password === 'senha-nova-segura'));
+});
+
+test('recuperação retorna 200 e não envia e-mail quando a conta não existe', async () => {
+  const c = cenario({}, {
+    listUsers: async () => ({ data: { users: [], nextPage: null }, error: null })
+  });
+  const res = resposta();
+  await c.controlador.solicitarRecuperacao({ body: { email: 'inexistente@example.com' } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body.mensagem, /Se houver uma conta/);
+  assert.equal(res.body.desafio.finalidade, 'recuperacao');
+  assert.equal(c.emails.length, 0);
+  assert.equal(c.repositorio.codigosVerificacao.length, 0);
+});
+
+test('recuperação envia para conta confirmada no Auth mesmo sem perfil local', async () => {
+  const c = cenario();
+  const res = resposta();
+  await c.controlador.solicitarRecuperacao({ body: { email: dados.email } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.equal(c.repositorio.usuarios.length, 0);
+  assert.equal(c.emails.length, 1);
+  assert.equal(c.emails[0].email, dados.email);
+  assert.equal(c.repositorio.codigosVerificacao[0].usuarioAuthId, identidade.id);
+});
+
+test('recuperação mantém resposta 200 e genérica quando o SMTP falha', async () => {
+  const c = cenario();
+  const servico = criarServicoAutenticacao(
+    c.repositorio,
+    () => ({}),
+    () => ({ auth: { admin: {
+      listUsers: async () => ({ data: { users: [identidade], nextPage: null }, error: null })
+    } } }),
+    { enviarCodigo: async () => { throw Object.assign(new Error('smtp'), { statusCode: 503, code: 'SMTP_ENVIO_FALHOU' }); } }
+  );
+  const res = resposta();
+  await criarControladorAutenticacao(servico).solicitarRecuperacao({ body: { email: dados.email } }, res);
+  assert.equal(res.statusCode, 200);
+  assert.match(res.body.mensagem, /Se houver uma conta/);
+  assert.ok(c.repositorio.codigosVerificacao[0].usadoEm);
 });
 
 test('reenvia a confirmação somente para cadastro ainda pendente', async () => {

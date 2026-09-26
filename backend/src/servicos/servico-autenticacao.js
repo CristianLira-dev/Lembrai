@@ -1,6 +1,7 @@
 const crypto = require('node:crypto');
 const { createClient } = require('@supabase/supabase-js');
 const ambiente = require('../configuracao/ambiente');
+const logger = require('../configuracao/logger');
 const { esquemaCadastro, validar } = require('../validadores/esquemas');
 const { removerSegredos } = require('../utilitarios/seguranca');
 const { ServicoEmail } = require('./servico-email');
@@ -8,6 +9,7 @@ const { ServicoEmail } = require('./servico-email');
 const ALFABETO_CODIGO = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const DURACAO_CODIGO_MS = 10 * 60 * 1000;
 const MAXIMO_TENTATIVAS = 5;
+const MENSAGEM_CODIGO = 'Se houver uma conta vinculada a este e-mail, o código será enviado em alguns instantes.';
 
 function falha(mensagem, statusCode, codigo) {
   return Object.assign(new Error(mensagem), { statusCode, ...(codigo ? { code: codigo } : {}) });
@@ -145,6 +147,39 @@ function criarServicoAutenticacao(
     };
   }
 
+  function respostaCodigo(desafio) {
+    return { mensagem: MENSAGEM_CODIGO, desafio };
+  }
+
+  async function buscarContaConfirmada(email) {
+    const perfil = await repositorio.buscarUsuarioPorEmail(email);
+    const admin = criarClienteAdmin().auth.admin;
+
+    if (perfil?.id) {
+      const { data, error } = await admin.getUserById(perfil.id);
+      const usuario = data?.user;
+      if (!error && usuario?.email?.toLowerCase() === email && usuario.email_confirmed_at) {
+        return { usuario, nome: perfil.nome || usuario.user_metadata?.nome };
+      }
+      if (error && error.status >= 500) throw traduzirErro(error);
+    }
+
+    let pagina = 1;
+    do {
+      const { data, error } = await admin.listUsers({ page: pagina, perPage: 1000 });
+      if (error) throw traduzirErro(error);
+      const usuario = (data?.users || []).find((item) => item.email?.toLowerCase() === email);
+      if (usuario) {
+        if (!usuario.email_confirmed_at) return null;
+        return { usuario, nome: perfil?.nome || usuario.user_metadata?.nome };
+      }
+      if (!data?.nextPage) return null;
+      pagina = data.nextPage;
+    } while (pagina);
+
+    return null;
+  }
+
   async function validarCodigo(desafioId, codigo, finalidadeEsperada) {
     const desafio = await repositorio.buscarCodigoVerificacao(desafioId);
     if (!desafio || desafio.usadoEm || desafio.finalidade !== finalidadeEsperada) {
@@ -246,11 +281,17 @@ function criarServicoAutenticacao(
   }
 
   async function solicitarRecuperacao({ email }) {
-    const perfil = await repositorio.buscarUsuarioPorEmail(email);
-    if (!perfil) return { desafio: criarDesafioFalso(email, 'recuperacao') };
-    return { desafio: await criarDesafio({
-      email, nome: perfil.nome, finalidade: 'recuperacao', usuarioAuthId: perfil.id
-    }) };
+    const conta = await buscarContaConfirmada(email);
+    if (!conta) return respostaCodigo(criarDesafioFalso(email, 'recuperacao'));
+    try {
+      return respostaCodigo(await criarDesafio({
+        email, nome: conta.nome, finalidade: 'recuperacao', usuarioAuthId: conta.usuario.id
+      }));
+    } catch (erro) {
+      if (!String(erro.code || '').startsWith('SMTP_')) throw erro;
+      logger.error({ codigo: erro.code }, 'falha ao enviar código de recuperação');
+      return respostaCodigo(criarDesafioFalso(email, 'recuperacao'));
+    }
   }
 
   async function redefinirSenha({ desafioId, codigo, novaSenha }) {
@@ -261,14 +302,14 @@ function criarServicoAutenticacao(
   }
 
   async function reenviarConfirmacao({ email }) {
-    if (await repositorio.buscarUsuarioPorEmail(email)) return { desafio: criarDesafioFalso(email, 'cadastro') };
+    if (await repositorio.buscarUsuarioPorEmail(email)) return respostaCodigo(criarDesafioFalso(email, 'cadastro'));
     const anterior = await repositorio.buscarUltimoCodigoVerificacao(email, 'cadastro', true);
-    if (!anterior?.usuarioAuthId) return { desafio: criarDesafioFalso(email, 'cadastro') };
+    if (!anterior?.usuarioAuthId) return respostaCodigo(criarDesafioFalso(email, 'cadastro'));
     const { data, error } = await criarClienteAdmin().auth.admin.getUserById(anterior.usuarioAuthId);
-    if (error || !data.user || data.user.email_confirmed_at) return { desafio: criarDesafioFalso(email, 'cadastro') };
-    return { desafio: await criarDesafio({
+    if (error || !data.user || data.user.email_confirmed_at) return respostaCodigo(criarDesafioFalso(email, 'cadastro'));
+    return respostaCodigo(await criarDesafio({
       email, nome: data.user.user_metadata?.nome, finalidade: 'cadastro', usuarioAuthId: data.user.id
-    }) };
+    }));
   }
 
   return {
