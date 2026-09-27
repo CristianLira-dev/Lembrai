@@ -5,6 +5,7 @@ const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const ambiente = require('./configuracao/ambiente');
 const logger = require('./configuracao/logger');
+const { serializarRequisicao } = logger;
 const { repositorio } = require('./repositorios/repositorio-dados');
 const { filas } = require('./filas/filas');
 const { ServicoWhatsapp } = require('./servicos/servico-whatsapp');
@@ -32,7 +33,10 @@ function criarAplicacao(dependencias = {}) {
   app.use(helmet());
   app.use(cors({ origin: ambiente.corsOrigens, credentials: true }));
   app.use(express.json({ limit: '1mb' }));
-  app.use(pinoHttp({ logger }));
+  app.use(pinoHttp({
+    logger,
+    serializers: { req: serializarRequisicao }
+  }));
   app.use(rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: true, legacyHeaders: false }));
   app.use('/api', criarRotas({ ...servicos, filaMensagens: servicos.filas.mensagens }));
   app.use((req, res) => res.status(404).json({ erro: 'Rota não encontrada' }));
