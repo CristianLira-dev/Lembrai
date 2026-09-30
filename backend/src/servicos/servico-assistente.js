@@ -46,6 +46,24 @@ function textoFallback(texto, opcoes = {}) {
 function dadosTarefa(t) {
   return Object.fromEntries(Object.entries(t || {}).filter(([k, v]) => ['title', 'subject', 'dueDate', 'dueTime', 'type'].includes(k) && v != null && v !== '').map(([k, v]) => [k, limpo(v)]));
 }
+function indiceDaReferencia(referencia) {
+  const correspondencia = normalizado(referencia).match(/^(?:(?:atividade|tarefa|prova|trabalho|seminario)\s*)?(\d{1,2})$/);
+  return correspondencia ? Number(correspondencia[1]) : null;
+}
+function propostaDeterministica(texto, opcoes = {}) {
+  const proposta = textoFallback(texto, opcoes);
+  // Cadastro continua usando o classificador, que pode extrair matéria e data
+  // de frases livres. Já comandos de alteração são determinísticos.
+  if (['complete_task', 'delete_task'].includes(proposta.intent)) return proposta;
+
+  // Ao responder à pergunta de qual atividade deseja concluir/remover, texto
+  // livre é uma referência, não uma nova atividade. Assim uma data isolada ou
+  // uma resposta ambígua nunca cria uma tarefa por acidente.
+  if (['complete_task', 'delete_task'].includes(opcoes.pendente?.intent) && String(texto).trim()) {
+    return { intent: opcoes.pendente.intent, reference: String(texto).trim(), requiresConfirmation: opcoes.pendente.intent === 'delete_task' };
+  }
+  return { intent: 'unknown' };
+}
 function resumo(t) {
   return '*' + limpo(t.title) + '* — ' + limpo(t.subject) + ' — entrega ' + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '');
 }
@@ -165,15 +183,20 @@ class ServicoAssistente {
       if (acao.intent !== 'edit_task' && proposta.reference && anterior?.reference && normalizado(proposta.reference) !== normalizado(anterior.reference)) acao.targetId = null;
       let alvo = acao.targetId ? tarefas.find((t) => t.id === acao.targetId) : null;
       if (!alvo && acao.reference) {
-        const palavras = normalizado(acao.reference).split(/\W+/).filter((p) => p && !['o', 'a', 'os', 'as', 'de', 'da', 'do', 'em', 'atividade'].includes(p));
-        const candidatos = palavras.length ? tarefas.filter((t) => palavras.every((p) => normalizado(t.titulo + ' ' + (t.materia || '')).includes(p))) : [];
-        if (candidatos.length === 1) alvo = candidatos[0];
-        else if (candidatos.length > 1) {
+        const indice = indiceDaReferencia(acao.reference);
+        if (indice) {
+          alvo = tarefas[indice - 1] || null;
+          if (!alvo) resposta = 'Não encontrei a atividade número ' + indice + '. Envie um número da lista ou o nome e a matéria.';
+        }
+        const palavras = normalizado(acao.reference).split(/\W+/).filter((p) => p && !['o', 'a', 'os', 'as', 'um', 'uma', 'meu', 'minha', 'de', 'da', 'do', 'em', 'atividade', 'tarefa'].includes(p));
+        const candidatos = !alvo && palavras.length ? tarefas.filter((t) => palavras.every((p) => normalizado(t.titulo + ' ' + (t.materia || '')).includes(p))) : [];
+        if (!alvo && candidatos.length === 1) alvo = candidatos[0];
+        else if (!alvo && candidatos.length > 1) {
           acao.stage = 'select';
           acao.options = candidatos.slice(0, 8).map((t) => t.id);
           resposta = 'Qual delas?\n' + candidatos.slice(0, 8).map((t, i) => (i + 1) + '. ' + resumo(tarefaDoBanco(t, usuario.fusoHorario))).join('\n');
           if (candidatos.length > 8) resposta += '\nHá mais opções; informe a matéria para filtrar.';
-        } else resposta = 'Não encontrei essa atividade nas suas pendências. Qual é o nome e a matéria?';
+        } else if (!alvo && !resposta) resposta = 'Não encontrei essa atividade nas suas pendências. Qual é o nome e a matéria?';
       }
       if (alvo) {
         acao.targetId = alvo.id;
@@ -344,13 +367,21 @@ class ServicoAssistente {
         resposta = social;
       } else {
         const [tarefas, materias] = await Promise.all([this.repositorio.listarTarefas(usuario.id, { status: 'pendente' }), this.repositorio.listarMaterias(usuario.id)]);
+        const local = propostaDeterministica(texto, { recebidoEm, fuso: usuario.fusoHorario, pendente });
         try {
-          interpretacao = await this.servicoChatbot.processar({
-            user: { id: usuario.id, name: 'Estudante', timezone: usuario.fusoHorario },
-            conversation: { id: conversa.id },
-            message: { id: mensagem.id, content: texto, receivedAt: new Date(recebidoEm).toISOString() },
-            context: { pendingAction: pendente, recentTasks: tarefas.slice(0, 50).map((t) => ({ titulo: t.titulo, materia: t.materia, dataEntrega: t.dataEntrega, horarioEntrega: t.horarioEntrega, status: t.status })), subjects: materias.map((m) => m.nome), reminderTime: usuario.horarioLembretes || '07:27' }
-          });
+          // Comandos e respostas de fluxos pendentes são tratados localmente.
+          // O modelo fica apenas para linguagem realmente ambígua, sem poder
+          // trocar uma conclusão/edição por um novo cadastro.
+          if (local.intent !== 'unknown') {
+            interpretacao = { ...local, generation: { provider: 'local', status: 'deterministic' } };
+          } else {
+            interpretacao = await this.servicoChatbot.processar({
+              user: { id: usuario.id, name: 'Estudante', timezone: usuario.fusoHorario },
+              conversation: { id: conversa.id },
+              message: { id: mensagem.id, content: texto, receivedAt: new Date(recebidoEm).toISOString() },
+              context: { pendingAction: pendente, recentTasks: tarefas.slice(0, 50).map((t) => ({ titulo: t.titulo, materia: t.materia, dataEntrega: t.dataEntrega, horarioEntrega: t.horarioEntrega, status: t.status })), subjects: materias.map((m) => m.nome), reminderTime: usuario.horarioLembretes || '07:27' }
+            });
+          }
         } catch (erro) {
           interpretacao = textoFallback(texto, { recebidoEm, fuso: usuario.fusoHorario, pendente });
           interpretacao.generation = {
