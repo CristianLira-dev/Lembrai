@@ -39,7 +39,7 @@ function PhoneMockup({ step = 5, compact = false }) {
     <div className="phone-glow" />
     <div className="phone-shell">
       <div className="phone-notch"><span /></div>
-      <div className="phone-topbar"><div className="phone-profile"><span className="phone-avatar"><Icon name="spark" size={12} /></span><span><strong>Lembraí</strong><small>online agora</small></span></div><span className="phone-more">•••</span></div>
+      <div className="phone-topbar"><div className="phone-profile"><span className="phone-avatar"><Icon name="spark" size={12} /></span><span><strong>Lembraí</strong><small>online agora</small></span></div></div>
       <div className="phone-body">
         <div className="phone-date">Hoje, 09:41</div>
         <div className="phone-message user-message"><span>Tenho um trabalho de programação para sexta.</span><small>09:42 ✓✓</small></div>
@@ -80,7 +80,7 @@ const perguntas = [
   ['Preciso instalar algum aplicativo?', 'Não. A experiência principal acontece pelo WhatsApp e o painel web acompanha tudo.'],
   ['Posso conectar meu calendário?', 'Sim. O sistema foi pensado para trabalhar com diferentes serviços de calendário.'],
   ['O assistente entende mensagens naturais?', 'Sim. Você pode escrever normalmente, como falaria com uma pessoa.'],
-  ['Quanto custa?', 'O primeiro mês é gratuito. Depois, o plano passa a custar R$ 9,99/mês.'],
+  ['Quanto custa?', 'O primeiro mês é gratuito. Depois, o plano passa a custar R$ 19,99/mês.'],
   ['Posso cancelar?', 'Sim. O usuário pode cancelar a assinatura conforme as condições apresentadas no processo de contratação.']
 ];
 
@@ -623,7 +623,7 @@ export function PaginaLanding() {
         <Link className="landing-button primary" to="/cadastro">
           Começar gratuitamente <Icon name="arrow" size={16} />
         </Link>
-        <small>1 mês grátis. Depois R$ 9,99/mês.</small>
+        <small>1 mês grátis. Depois R$ 19,99/mês.</small>
       </div>
       <div className="final-cta-visual">
         <PhoneMockup compact />

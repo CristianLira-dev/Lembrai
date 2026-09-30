@@ -1695,7 +1695,7 @@ h3 {
     justify-content: space-between;
     align-items: center;
     min-height: 31px;
-    padding: 0 7px 0 11px;
+    padding: 0 3px 0 11px;
     border: 1px solid #2c2c30;
     border-radius: 18px;
     color: var(--ds-tertiary);
@@ -1705,8 +1705,8 @@ h3 {
 .phone-send {
     display: grid;
     place-items: center;
-    width: 22px;
-    height: 22px;
+    width: 20px;
+    height: 20px;
     border-radius: 50%;
     background: var(--ds-pink);
     color: var(--ds-white);
@@ -1988,6 +1988,7 @@ h3 {
 .story-visual {
     position: relative;
     min-width: 0;
+    margin: 100px 0;
 }
 
 .story-sticky {
@@ -3264,6 +3265,7 @@ h3 {
         top: auto;
         min-height: auto;
         padding-top: 80px;
+        margin-top: 30px;
     }
     .story-sticky>.landing-eyebrow {
         align-self: center;
