@@ -88,7 +88,9 @@ function acaoSobreTarefa(baixo) {
     || baixo.match(/^(?:marcar|marque|marca)\s+como\s+(?:concluida|concluido|finalizada|finalizado|feita|feito)\s+(.+)$/);
   if (marcar) return { intent: 'complete_task', reference: limparReferencia(marcar[1]) };
 
-  const concluir = baixo.match(/^(?:terminei|conclui|finalizei|concluir|conclua|finalizar|finalize)\s*(.*)$/);
+  // Aceita pedidos naturais como "quero concluir minha prova". Essa intenção
+  // precisa prevalecer sobre qualquer cadastro que tenha ficado pendente.
+  const concluir = baixo.match(/^(?:(?:quero\s+)?(?:concluir|conclua|finalizar|finalize)|terminei|conclui(?:do|da)?|finalizei|finalizado|finalizada)\s*(.*)$/);
   if (concluir) return { intent: 'complete_task', reference: limparReferencia(concluir[1]) };
 
   const remover = baixo.match(/^(?:quero\s+)?(?:remover|remova|remove|excluir|exclua|exclui|apagar|apague|deletar|delete)\s*(.*)$/);
@@ -97,7 +99,7 @@ function acaoSobreTarefa(baixo) {
 }
 
 function interpretarEdicao(texto, baixo, recebidoEm, fuso, pendente) {
-  const comando = baixo.match(/^(?:quero\s+)?(?:mudar|mude|alterar|altere|editar|edite|trocar|troque)\s*(.*)$/);
+  const comando = baixo.match(/^(?:quero\s+)?(?:mudar|muda|mude|alterar|altere|editar|edite|trocar|troque)\s*(.*)$/);
   if (!comando && pendente?.intent !== 'edit_task') return null;
 
   const conteudo = comando ? comando[1] : baixo;
