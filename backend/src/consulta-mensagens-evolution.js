@@ -30,7 +30,9 @@ function iniciarConsultaMensagensEvolution({
   repositorio,
   servicoAssistente,
   intervaloMs = 15_000,
-  janelaInicialMs = 5 * 60_000,
+  // Recupera mensagens recebidas enquanto o backend esteve indisponível. O
+  // repositório deduplica pelo ID externo, portanto não responde duas vezes.
+  janelaInicialMs = 24 * 60 * 60_000,
   agora = () => Date.now()
 }) {
   const inicioDaJanela = agora() - janelaInicialMs;
