@@ -1,4 +1,9 @@
-const { formatarResumoPendencias, proximoResumoDiario, proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
+const {
+  formatarResumoPendencias,
+  formatarAvisoTarefasAtrasadas,
+  proximoResumoDiario,
+  proximoResumoInicial
+} = require('../utilitarios/resumo-pendencias');
 
 const MENSAGEM_INATIVIDADE = 'Estamos sentindo sua falta… 😢 continue registrando suas atividades para não perder tarefas importantes';
 const DIAS_INATIVIDADE = 14;
@@ -50,6 +55,8 @@ class ServicoLembretes {
         const tarefas = await this.repositorio.listarTarefas(usuario.id, { status: 'pendente' });
         if (!tarefas.length) continue;
         await this.servicoWhatsapp.enviarResposta(usuario.telefone, formatarResumoPendencias(tarefas, usuario));
+        const avisoAtrasadas = formatarAvisoTarefasAtrasadas(tarefas, usuario, agora);
+        if (avisoAtrasadas) await this.servicoWhatsapp.enviarResposta(usuario.telefone, avisoAtrasadas);
         await this.repositorio.atualizarUsuario(usuario.id, {
           ultimoResumoPendenciasEm: agora,
           proximoResumoPendenciasEm: proximoResumoDiario(usuario, agora)
@@ -94,7 +101,8 @@ class ServicoLembretes {
     const usuario = await this.repositorio.buscarUsuarioPorId(lembrete.usuarioId);
     try {
       const prazo = new Date(tarefa.dataEntrega).toLocaleDateString('pt-BR', { timeZone: usuario.fusoHorario || 'America/Sao_Paulo' });
-      await this.servicoWhatsapp.enviarResposta(usuario.telefone, `🔔 ${tarefa.titulo} — ${tarefa.materia || 'atividade'} — entrega ${prazo}.\nQuando terminar, me avisa por aqui!`);
+      await this.servicoWhatsapp.enviarResposta(usuario.telefone, `🔔 ${tarefa.titulo} — ${tarefa.materia || 'atividade'} — entrega ${prazo}.
+Quando terminar, me avisa por aqui!`);
       await this.repositorio.atualizarLembrete(lembrete.usuarioId, lembrete.id, { status: 'enviado', tentativas: (lembrete.tentativas || 0) + 1, enviadoEm: new Date() });
       return { enviado: true };
     } catch (erro) {

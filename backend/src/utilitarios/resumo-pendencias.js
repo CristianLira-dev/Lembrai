@@ -33,10 +33,49 @@ function formatarPrazo(dataEntrega, horarioEntrega, fuso) {
 function formatarResumoPendencias(tarefas, usuario) {
   const fuso = fusoDoUsuario(usuario);
   const itens = tarefas.map((tarefa, indice) => {
-    const materia = tarefa.materia ? '\n   Matéria: ' + tarefa.materia : '';
-    return (indice + 1) + '. *' + tarefa.titulo + '*' + materia + '\n   Entrega: ' + formatarPrazo(tarefa.dataEntrega, tarefa.horarioEntrega, fuso);
+    const materia = tarefa.materia ? '
+   Matéria: ' + tarefa.materia : '';
+    return (indice + 1) + '. *' + tarefa.titulo + '*' + materia + '
+   Entrega: ' + formatarPrazo(tarefa.dataEntrega, tarefa.horarioEntrega, fuso);
   });
-  return '📚 Suas atividades pendentes:\n\n' + itens.join('\n\n') + '\n\nQuando concluir alguma, me avisa por aqui!';
+  return '📚 Suas atividades pendentes:
+
+' + itens.join('
+
+') + '
+
+Quando concluir alguma, me avisa por aqui!';
 }
 
-module.exports = { proximoResumoInicial, proximoResumoDiario, formatarResumoPendencias };
+function formatarAvisoTarefasAtrasadas(tarefas, usuario, agora = new Date()) {
+  const fuso = fusoDoUsuario(usuario);
+  const hoje = dataNoFuso(agora, fuso);
+  const atrasadas = tarefas.filter((tarefa) => dataNoFuso(tarefa.dataEntrega, fuso) < hoje);
+
+  if (!atrasadas.length) return null;
+
+  const itens = atrasadas.map((tarefa, indice) => {
+    const materia = tarefa.materia ? '
+   Matéria: ' + tarefa.materia : '';
+    return (indice + 1) + '. *' + tarefa.titulo + '*' + materia
+      + '
+   Prazo: ' + formatarPrazo(tarefa.dataEntrega, tarefa.horarioEntrega, fuso);
+  });
+
+  return '⚠️ Estas atividades ainda aparecem como pendentes, mas o prazo já passou:
+
+'
+    + itens.join('
+
+')
+    + '
+
+Você conseguiu concluir alguma delas? Se sim, me avisa por aqui!';
+}
+
+module.exports = {
+  proximoResumoInicial,
+  proximoResumoDiario,
+  formatarResumoPendencias,
+  formatarAvisoTarefasAtrasadas
+};
