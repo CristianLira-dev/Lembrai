@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { ProvedorAutenticacao } from './contextos/ContextoAutenticacao';
 import { RotasAplicacao } from './rotas/RotasAplicacao';
 import './estilos/global.css';
+import './estilos/app-2026.css';
 
 ReactDOM.createRoot(document.getElementById('raiz')).render(
   <React.StrictMode>
