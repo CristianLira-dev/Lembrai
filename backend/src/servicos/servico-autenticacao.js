@@ -79,7 +79,8 @@ function criarServicoAutenticacao(
   repositorio,
   criarCliente = criarClienteAuth,
   criarClienteAdmin = criarClienteAuthAdmin,
-  servicoEmail = new ServicoEmail()
+  servicoEmail = new ServicoEmail(),
+  servicoWhatsapp = null
 ) {
   async function verificarToken(token) {
     const { data, error } = await criarCliente().auth.getUser(token);
@@ -276,7 +277,13 @@ function criarServicoAutenticacao(
       if (!data.user) throw falha('Não foi possível confirmar seu e-mail.', 503);
     }
     const autenticacao = await criarSessao(desafio.email);
-    if (finalidade === 'cadastro') await obterPerfil(autenticacao.user);
+    if (finalidade === 'cadastro') {
+      const perfil = await obterPerfil(autenticacao.user);
+      if (servicoWhatsapp && perfil.telefone) {
+        await servicoWhatsapp.enviarResposta(perfil.telefone, '🎉 Sua conta Lembraí está pronta!\n\nVocê pode começar dizendo:\n• “Tenho prova de Banco de Dados sexta às 19h”\n• “Quero estudar algoritmos até dia 20”\n• “Quais são minhas pendências?”').catch(() => {});
+        await repositorio.atualizarUsuario(perfil.id, { onboardingConcluidoEm: new Date(), consentimentoWhatsAppEm: new Date() });
+      }
+    }
     return { sessao: autenticacao.session };
   }
 
@@ -288,7 +295,7 @@ function criarServicoAutenticacao(
         email, nome: conta.nome, finalidade: 'recuperacao', usuarioAuthId: conta.usuario.id
       }));
     } catch (erro) {
-      if (!String(erro.code || '').startsWith('SMTP_')) throw erro;
+      if (!/^(SMTP|EMAIL)_/.test(String(erro.code || ''))) throw erro;
       logger.error({ codigo: erro.code }, 'falha ao enviar código de recuperação');
       return respostaCodigo(criarDesafioFalso(email, 'recuperacao'));
     }

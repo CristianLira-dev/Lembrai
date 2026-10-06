@@ -1,0 +1,7 @@
+{$API_DOMAIN} {
+  reverse_proxy backend-api:3000
+}
+
+{$EVOLUTION_DOMAIN} {
+  reverse_proxy evolution:8080
+}

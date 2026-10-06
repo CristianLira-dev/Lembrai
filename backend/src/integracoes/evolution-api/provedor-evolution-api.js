@@ -12,6 +12,10 @@ function extrairTextoMensagem(dados = {}) {
     || '';
 }
 
+function extrairIdEnvio(resultado = {}) {
+  return resultado.key?.id || resultado.data?.key?.id || resultado.message?.key?.id || resultado.id || null;
+}
+
 class ProvedorEvolutionApi {
   constructor() {
     this.simulado = ambiente.modoWhatsapp !== 'evolution' || !ambiente.evolutionUrl || !ambiente.evolutionChave;
@@ -54,4 +58,4 @@ class ProvedorEvolutionApi {
   }
 }
 
-module.exports = { ProvedorEvolutionApi, normalizarTelefone, extrairTextoMensagem };
+module.exports = { ProvedorEvolutionApi, normalizarTelefone, extrairTextoMensagem, extrairIdEnvio };

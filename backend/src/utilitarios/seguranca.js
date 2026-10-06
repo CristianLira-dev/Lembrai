@@ -7,7 +7,10 @@ async function gerarHashSenha(senha) {
 }
 
 function obterChaveCriptografia() {
-  if (!ambiente.chaveCriptografiaTokens) return null;
+  if (!ambiente.chaveCriptografiaTokens) {
+    if (ambiente.ambiente === 'producao') throw new Error('Criptografia de tokens não configurada');
+    return null;
+  }
   const chave = Buffer.from(ambiente.chaveCriptografiaTokens, 'hex');
   if (chave.length !== 32) throw new Error('CHAVE_CRIPTOGRAFIA_TOKENS deve conter 32 bytes em hexadecimal');
   return chave;
@@ -27,7 +30,11 @@ function criptografar(valor) {
 function descriptografar(valor) {
   if (!valor) return null;
   const chave = obterChaveCriptografia();
-  if (!chave || !valor.includes('.')) return valor;
+  if (!chave) return valor;
+  if (!valor.includes('.')) {
+    if (ambiente.ambiente === 'producao') throw new Error('Token legado sem criptografia bloqueado');
+    return valor;
+  }
   const [ivTexto, tagTexto, conteudoTexto] = valor.split('.');
   const decifra = crypto.createDecipheriv('aes-256-gcm', chave, Buffer.from(ivTexto, 'base64url'));
   decifra.setAuthTag(Buffer.from(tagTexto, 'base64url'));

@@ -1,4 +1,5 @@
 const nodemailer = require('nodemailer');
+const axios = require('axios');
 const ambiente = require('../configuracao/ambiente');
 
 function falhaEmail(mensagem, codigo) {
@@ -41,7 +42,8 @@ class ServicoEmail {
 
   configurado() {
     const smtp = this.configuracao || {};
-    return Boolean(smtp.host && smtp.porta && smtp.usuario && smtp.senha && smtp.remetente);
+    return Boolean(ambiente.resend.apiKey && ambiente.resend.remetente)
+      || Boolean(smtp.host && smtp.porta && smtp.usuario && smtp.senha && smtp.remetente);
   }
 
   obterTransporte() {
@@ -68,23 +70,32 @@ class ServicoEmail {
     if (!conteudo) throw falhaEmail('Não foi possível preparar o e-mail de verificação.', 'EMAIL_FINALIDADE_INVALIDA');
     const nomeSeguro = escaparHtml(nome || 'estudante');
     const codigoSeguro = escaparHtml(codigo);
-    const remetente = this.configuracao;
+    const remetente = ambiente.resend.apiKey ? ambiente.resend : this.configuracao;
+    const texto = `Olá, ${nome || 'estudante'}! ${conteudo.texto} Código: ${codigo}. Ele expira em 10 minutos.`;
+    const html = `<!doctype html>
+      <html lang="pt-BR"><body style="margin:0;background:#f5f7f5;font-family:Arial,sans-serif;color:#17201b">
+        <div style="max-width:520px;margin:32px auto;background:#fff;border:1px solid #dce5df;border-radius:16px;padding:32px">
+          <div style="font-size:22px;font-weight:700;color:#169b62">Lembraí</div>
+          <h1 style="font-size:24px;margin:28px 0 12px">${conteudo.titulo}</h1>
+          <p>Olá, ${nomeSeguro}! ${conteudo.texto}</p>
+          <div style="margin:28px 0;padding:18px;text-align:center;border-radius:12px;background:#eef9f3;font-size:32px;font-weight:700;letter-spacing:8px">${codigoSeguro}</div>
+          <p style="color:#5b6961">O código expira em 10 minutos e pode ser usado uma única vez. Se você não solicitou esta ação, ignore este e-mail.</p>
+        </div>
+      </body></html>`;
     try {
+      if (ambiente.resend.apiKey) {
+        const resposta = await axios.post('https://api.resend.com/emails', {
+          from: `${remetente.nomeRemetente || 'Lembraí'} <${remetente.remetente}>`, to: [email],
+          subject: conteudo.assunto, text: texto, html
+        }, { timeout: 12000, headers: { Authorization: `Bearer ${ambiente.resend.apiKey}`, 'Content-Type': 'application/json' } });
+        return { messageId: resposta.data?.id || null, provedor: 'resend' };
+      }
       const resultado = await this.obterTransporte().sendMail({
         from: { name: remetente.nomeRemetente || 'Lembraí', address: remetente.remetente },
         to: email,
         subject: conteudo.assunto,
-        text: `Olá, ${nome || 'estudante'}! ${conteudo.texto} Código: ${codigo}. Ele expira em 10 minutos.`,
-        html: `<!doctype html>
-          <html lang="pt-BR"><body style="margin:0;background:#f5f7f5;font-family:Arial,sans-serif;color:#17201b">
-            <div style="max-width:520px;margin:32px auto;background:#fff;border:1px solid #dce5df;border-radius:16px;padding:32px">
-              <div style="font-size:22px;font-weight:700;color:#169b62">Lembraí</div>
-              <h1 style="font-size:24px;margin:28px 0 12px">${conteudo.titulo}</h1>
-              <p>Olá, ${nomeSeguro}! ${conteudo.texto}</p>
-              <div style="margin:28px 0;padding:18px;text-align:center;border-radius:12px;background:#eef9f3;font-size:32px;font-weight:700;letter-spacing:8px">${codigoSeguro}</div>
-              <p style="color:#5b6961">O código expira em 10 minutos e pode ser usado uma única vez. Se você não solicitou esta ação, ignore este e-mail.</p>
-            </div>
-          </body></html>`
+        text: texto,
+        html
       });
       if (Array.isArray(resultado?.rejected) && resultado.rejected.length > 0
         && (!Array.isArray(resultado.accepted) || resultado.accepted.length === 0)) {
@@ -93,7 +104,7 @@ class ServicoEmail {
       return { messageId: resultado?.messageId || null };
     } catch (erro) {
       if (erro?.code === 'SMTP_NAO_CONFIGURADO') throw erro;
-      throw falhaEmail('Não foi possível enviar o código por e-mail. Tente novamente em instantes.', 'SMTP_ENVIO_FALHOU');
+      throw falhaEmail('Não foi possível enviar o código por e-mail. Tente novamente em instantes.', ambiente.resend.apiKey ? 'EMAIL_API_FALHOU' : 'SMTP_ENVIO_FALHOU');
     }
   }
 }

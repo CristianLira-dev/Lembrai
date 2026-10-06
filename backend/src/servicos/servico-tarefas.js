@@ -2,7 +2,7 @@ const { filas } = require('../filas/filas');
 const { dataHorarioNoFuso } = require('../utilitarios/datas');
 const { proximoResumoInicial } = require('../utilitarios/resumo-pendencias');
 
-const mapaTipo = { exam: 'prova', assignment: 'trabalho', task: 'tarefa', class: 'aula', appointment: 'compromisso', other: 'outro', prova: 'prova', trabalho: 'trabalho', tarefa: 'tarefa' };
+const mapaTipo = { exam: 'prova', assignment: 'trabalho', task: 'tarefa', study: 'estudo', class: 'aula', appointment: 'compromisso', other: 'outro', prova: 'prova', trabalho: 'trabalho', tarefa: 'tarefa', estudo: 'estudo' };
 const mapaPrioridade = { low: 'baixa', medium: 'media', high: 'alta', baixa: 'baixa', media: 'media', alta: 'alta' };
 
 function paraDataEntrega(tarefa) {
@@ -16,6 +16,25 @@ function calcularAgendamento(dataEntrega, lembrete = { amount: 1, unit: 'day' })
   const unidade = lembrete.unit || lembrete.unidade || 'day';
   const unidadeMs = /^(minute|minuto)/.test(unidade) ? 60000 : /^(hour|hora)/.test(unidade) ? 3600000 : 86400000;
   return new Date(new Date(dataEntrega).getTime() - quantidade * unidadeMs);
+}
+
+async function criarPlanoAutomatico(repositorio, usuarioId, tarefa) {
+  const plano = await repositorio.criarPlanoEstudo({
+    usuarioId, titulo: tarefa.titulo.replace(/^Estudar\s+/i, ''), materia: tarefa.materia,
+    objetivo: tarefa.descricao, dataLimite: tarefa.dataEntrega, minutosPorSessao: tarefa.duracao || 45,
+    diasSemana: [1, 2, 3, 4, 5]
+  });
+  const data = new Date(); data.setDate(data.getDate() + 1); data.setHours(19, 0, 0, 0);
+  const limite = new Date(tarefa.dataEntrega);
+  let criadas = 0;
+  while (data <= limite && criadas < 60) {
+    if ([1, 2, 3, 4, 5].includes(data.getDay())) {
+      await repositorio.criarSessaoEstudo({ usuarioId, planoEstudoId: plano.id, titulo: `Estudar ${plano.titulo}`, agendadaPara: new Date(data), duracaoMinutos: plano.minutosPorSessao });
+      criadas += 1;
+    }
+    data.setDate(data.getDate() + 1);
+  }
+  return plano;
 }
 
 class ServicoTarefas {
@@ -44,6 +63,12 @@ class ServicoTarefas {
         proximoResumoPendenciasEm: proximoResumoInicial(usuario)
       });
     }
+    for (const minutos of usuario.antecedenciasLembrete || []) {
+      const agendadoPara = new Date(new Date(tarefa.dataEntrega).getTime() - minutos * 60000);
+      if (agendadoPara <= new Date()) continue;
+      const lembrete = await this.repositorio.criarLembrete({ tarefaId: tarefa.id, usuarioId, agendadoPara, tipo: `antecedencia_${minutos}` });
+      await filas.lembretes.add('enviar-lembrete', { lembreteId: lembrete.id }, { delay: Math.max(0, agendadoPara - Date.now()), jobId: `lembrete-${lembrete.id}` });
+    }
     return true;
   }
 
@@ -66,6 +91,10 @@ class ServicoTarefas {
         ultimaAtividadeRegistradaEm: tarefa.criadoEm || new Date(),
         ultimoAvisoInatividadeEm: null
       });
+      if (tarefa.tipo === 'estudo' && this.repositorio.criarPlanoEstudo) {
+        try { await criarPlanoAutomatico(this.repositorio, usuarioId, tarefa); }
+        catch { /* A tarefa continua válida mesmo se o plano detalhado falhar. */ }
+      }
     }
     let lembreteAgendado = false;
     const avisos = [];
@@ -107,6 +136,7 @@ class ServicoTarefas {
   }
 
   async excluir(usuarioId, id) {
+    try { await this.servicoCalendarios.removerEventoParaTarefa(usuarioId, id); } catch {}
     const excluida = await this.repositorio.excluirTarefa(usuarioId, id);
     if (excluida) await this.limparResumoSemPendencias(usuarioId);
     return excluida;

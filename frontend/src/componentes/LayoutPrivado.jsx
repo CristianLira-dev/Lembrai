@@ -6,6 +6,7 @@ import { MarcaLembrai } from './MarcaLembrai';
 const links = [
   { to: '/painel', rotulo: 'Visão geral', icone: '⌂' },
   { to: '/tarefas', rotulo: 'Tarefas', icone: '✓' },
+  { to: '/estudos', rotulo: 'Planos de estudo', icone: '✦' },
   { to: '/calendario', rotulo: 'Calendário', icone: '◫' },
   { to: '/integracoes', rotulo: 'Integrações', icone: '◎' },
   { to: '/notificacoes', rotulo: 'Notificações', icone: '◔' },
@@ -29,6 +30,7 @@ export function LayoutPrivado() {
         <p className="marca-subtitulo">seu espaço acadêmico</p>
         <nav className="navegacao" aria-label="Navegação do painel">
           {links.map((link) => <NavLink key={link.to} to={link.to} className={({ isActive }) => isActive ? 'navegacao-link ativo' : 'navegacao-link'}><span aria-hidden="true">{link.icone}</span>{link.rotulo}</NavLink>)}
+          {usuario?.administrador ? <NavLink to="/admin" className={({ isActive }) => isActive ? 'navegacao-link ativo' : 'navegacao-link'}><span aria-hidden="true">⚑</span>Administração</NavLink> : null}
         </nav>
         <div className="barra-lateral-rodape">
           <div className="avatar pequeno">{usuario?.nome?.slice(0, 1).toUpperCase() || 'E'}</div>

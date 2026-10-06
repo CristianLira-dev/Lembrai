@@ -41,7 +41,7 @@ class Lembrete(BaseModel):
 class TarefaInterpretada(BaseModel):
     title: str | None = None
     subject: str | None = None
-    type: Literal["exam", "assignment", "task", "class", "appointment", "other"] = "task"
+    type: Literal["exam", "assignment", "task", "study", "class", "appointment", "other"] = "task"
     dueDate: str | None = None
     dueTime: str | None = None
     dueDateTime: str | None = None
@@ -53,7 +53,7 @@ class TarefaInterpretada(BaseModel):
 
 
 class RespostaProcessamento(BaseModel):
-    intent: Literal["create_task", "create_subject", "edit_task", "delete_task", "list_pending", "list_today", "list_week", "next_exam", "list_overdue", "list_subjects", "get_reminder_time", "set_reminder_time", "complete_task", "confirm", "cancel", "unknown"]
+    intent: Literal["create_task", "create_subject", "edit_task", "delete_task", "list_pending", "list_today", "list_week", "next_exam", "list_overdue", "list_subjects", "get_reminder_time", "set_reminder_time", "complete_task", "confirm", "cancel", "general_chat", "unknown"]
     confidence: float = Field(ge=0, le=1)
     requiresConfirmation: bool = False
     missingFields: list[str] = Field(default_factory=list)

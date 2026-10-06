@@ -1,0 +1,118 @@
+services:
+  postgres-evolution:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${EVOLUTION_POSTGRES_DB}
+      POSTGRES_USER: ${EVOLUTION_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${EVOLUTION_POSTGRES_PASSWORD}
+    volumes:
+      - evolution_postgres:/var/lib/postgresql/data
+    networks: [privada]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes", "--requirepass", "${VALKEY_PASSWORD}"]
+    volumes:
+      - valkey_data:/data
+    networks: [privada]
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  evolution:
+    image: evoapicloud/evolution-api:v2.3.7
+    restart: unless-stopped
+    depends_on:
+      postgres-evolution: { condition: service_healthy }
+      valkey: { condition: service_healthy }
+    environment:
+      SERVER_URL: https://${EVOLUTION_DOMAIN}
+      AUTHENTICATION_API_KEY: ${EVOLUTION_API_CHAVE}
+      DATABASE_ENABLED: "true"
+      DATABASE_PROVIDER: postgresql
+      DATABASE_CONNECTION_URI: postgresql://${EVOLUTION_POSTGRES_USER}:${EVOLUTION_POSTGRES_PASSWORD}@postgres-evolution:5432/${EVOLUTION_POSTGRES_DB}
+      CACHE_REDIS_ENABLED: "true"
+      CACHE_REDIS_URI: redis://:${VALKEY_PASSWORD}@valkey:6379/0
+      CACHE_REDIS_PREFIX_KEY: evolution
+    volumes:
+      - evolution_instances:/evolution/instances
+    networks: [privada]
+
+  backend-api:
+    build:
+      context: ../backend
+    restart: unless-stopped
+    env_file: [../.env]
+    environment:
+      AMBIENTE: producao
+      REDIS_URL: redis://:${VALKEY_PASSWORD}@valkey:6379/1
+      EVOLUTION_API_URL: http://evolution:8080
+      URL_BACKEND: https://${API_DOMAIN}
+    depends_on:
+      valkey: { condition: service_healthy }
+      evolution: { condition: service_started }
+    networks: [privada]
+
+  backend-worker:
+    build:
+      context: ../backend
+    command: ["node", "src/worker.js"]
+    restart: unless-stopped
+    env_file: [../.env]
+    environment:
+      AMBIENTE: producao
+      REDIS_URL: redis://:${VALKEY_PASSWORD}@valkey:6379/1
+      EVOLUTION_API_URL: http://evolution:8080
+    depends_on:
+      valkey: { condition: service_healthy }
+      backend-api: { condition: service_started }
+    networks: [privada]
+
+  backend-scheduler:
+    build:
+      context: ../backend
+    command: ["node", "src/agendador-worker.js"]
+    restart: unless-stopped
+    env_file: [../.env]
+    environment:
+      AMBIENTE: producao
+      REDIS_URL: redis://:${VALKEY_PASSWORD}@valkey:6379/1
+      EVOLUTION_API_URL: http://evolution:8080
+    depends_on:
+      valkey: { condition: service_healthy }
+      backend-api: { condition: service_started }
+    networks: [privada]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      API_DOMAIN: ${API_DOMAIN}
+      EVOLUTION_DOMAIN: ${EVOLUTION_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [backend-api, evolution]
+    networks: [privada]
+
+networks:
+  privada:
+    driver: bridge
+
+volumes:
+  evolution_postgres:
+  evolution_instances:
+  valkey_data:
+  caddy_data:
+  caddy_config:

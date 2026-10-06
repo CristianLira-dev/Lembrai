@@ -4,18 +4,19 @@ const { ServicoChatbot, codigoSeguroErroChatbot } = require('./servico-chatbot')
 const { interpretarLocal } = require('./interpretador-local');
 const { dataNoFuso, dataValida, horarioValido, dataHorarioNoFuso, somarDias, formatarData } = require('../utilitarios/datas');
 const { normalizarTelefone } = require('../utilitarios/telefone');
+const { extrairIdEnvio } = require('../integracoes/evolution-api/provedor-evolution-api');
 
 const SEM_CONTA = 'Ainda não achei uma conta ligada a esse número. Cria a sua por aqui e depois me chama de novo: https://lembrai-chat.vercel.app/cadastro';
-const FORA_ESCOPO = 'Esse assunto eu não consigo ajudar por aqui. Mas posso cadastrar, editar, concluir ou remover atividades e mostrar suas pendências!';
-const SAUDACAO = 'Oi! Sou a Lembraí, sua assistente de atividades e prazos. 📚\nPosso cadastrar, editar, concluir e remover atividades, além de mostrar pendências e ajustar lembretes. Como posso ajudar?';
+const FORA_ESCOPO = 'Posso conversar sobre isso de forma breve e também transformar o assunto em um plano de estudo. Se quiser organizar, diga o tema e até quando pretende estudar.';
+const SAUDACAO = 'Oi! Sou a Lembraí, sua assistente de atividades, estudos e prazos. 📚\nPosso organizar assuntos para estudar, cadastrar atividades, mostrar pendências e ajustar lembretes. Como posso ajudar?';
 const FALHA = 'Não consegui fazer isso agora. Tenta de novo em instantes?';
 const MUTACOES = ['create_task', 'create_subject', 'complete_task', 'edit_task', 'delete_task', 'set_reminder_time'];
 const CONSULTAS = ['list_pending', 'list_today', 'list_week', 'next_exam', 'list_overdue', 'list_subjects', 'get_reminder_time'];
 const opcional = (max) => z.string().trim().max(max).nullable().optional();
 const propostaSchema = z.object({
-  intent: z.enum([...MUTACOES, ...CONSULTAS, 'unknown']),
-  task: z.object({ title: opcional(180), subject: opcional(120), dueDate: opcional(10), dueTime: opcional(5), type: z.enum(['exam', 'assignment', 'task', 'class', 'appointment', 'other']).optional() }).nullable().optional(),
-  reference: opcional(300), subject: opcional(120), reminderTime: opcional(5)
+  intent: z.enum([...MUTACOES, ...CONSULTAS, 'general_chat', 'unknown']),
+  task: z.object({ title: opcional(180), subject: opcional(120), dueDate: opcional(10), dueTime: opcional(5), type: z.enum(['exam', 'assignment', 'task', 'study', 'class', 'appointment', 'other']).optional() }).nullable().optional(),
+  reference: opcional(300), subject: opcional(120), reminderTime: opcional(5), response: opcional(600)
 });
 
 function normalizado(s = '') { return String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(); }
@@ -33,6 +34,10 @@ function interacaoSocial(texto) {
 }
 function telefoneLimpo(s = '') { return normalizarTelefone(s); }
 function limpo(s) { return typeof s === 'string' ? s.replace(/[*_~\x00-\x1f]/g, ' ').replace(/\s+/g, ' ').trim() : null; }
+function respostaConversacional(valor) {
+  const resposta = limpo(valor);
+  return resposta && resposta.length <= 600 ? resposta : FORA_ESCOPO;
+}
 function comandoExplicito(texto) {
   const t = normalizado(texto).replace(/[.!?]+$/g, '').trim();
   if (/^(sim|s|confirmo|pode|pode sim|pode registrar|pode salvar|pode concluir|pode alterar|pode remover|pode excluir|ok|confirmado|fechado)$/.test(t)) return 'confirm';
@@ -54,7 +59,7 @@ function propostaDeterministica(texto, opcoes = {}) {
   const proposta = textoFallback(texto, opcoes);
   // Cadastro continua usando o classificador, que pode extrair matéria e data
   // de frases livres. Já comandos de alteração são determinísticos.
-  if (['complete_task', 'delete_task'].includes(proposta.intent)) return proposta;
+  if (['complete_task', 'delete_task'].includes(proposta.intent) || proposta.task?.type === 'study') return proposta;
 
   // Ao responder à pergunta de qual atividade deseja concluir/remover, texto
   // livre é uma referência, não uma nova atividade. Assim uma data isolada ou
@@ -65,12 +70,18 @@ function propostaDeterministica(texto, opcoes = {}) {
   return { intent: 'unknown' };
 }
 function resumo(t) {
-  return '*' + limpo(t.title) + '* — ' + limpo(t.subject) + ' — entrega ' + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '');
+  const materia = t.subject ? ' — ' + limpo(t.subject) : '';
+  const prazo = t.type === 'study' ? ' — estudar até ' : ' — entrega ';
+  return '*' + limpo(t.title) + '*' + materia + prazo + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '');
 }
 function mensagemCadastro(t) {
   const titulo = limpo(t.title);
   const materia = limpo(t.subject);
   const tipo = normalizado(t.type);
+  if (tipo === 'study') {
+    return titulo + (materia ? ' (' + materia + ')' : '') + ' organizado para estudo até o dia '
+      + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '') + '.';
+  }
   const tituloNormalizado = normalizado(titulo);
   const feminino = ['exam', 'task', 'class'].includes(tipo)
     || /^(prova|tarefa|atividade|aula|apresentacao|entrega|avaliacao)\b/.test(tituloNormalizado);
@@ -80,7 +91,7 @@ function mensagemCadastro(t) {
   return identificacao + ' ' + (feminino ? 'marcada' : 'marcado')
     + ' para o dia ' + formatarData(t.dueDate) + (t.dueTime ? ' às ' + t.dueTime : '') + '.';
 }
-function tarefaDoBanco(t, fuso) { return { title: t.titulo, subject: t.materia, dueDate: dataNoFuso(t.dataEntrega, fuso), dueTime: t.horarioEntrega || null }; }
+function tarefaDoBanco(t, fuso) { return { title: t.titulo, subject: t.materia, type: t.tipo === 'estudo' || /^estudar\b/i.test(t.titulo) ? 'study' : undefined, dueDate: dataNoFuso(t.dataEntrega, fuso), dueTime: t.horarioEntrega || null }; }
 function perguntaFaltante(acao) {
   if (acao.intent === 'create_subject') return 'Qual é o nome da matéria?';
   if (acao.intent === 'set_reminder_time') return 'Qual horário você prefere para os lembretes? Use, por exemplo, 08:30.';
@@ -94,9 +105,9 @@ function perguntaFaltante(acao) {
     return 'O que você quer mudar: nome, data, horário ou matéria?';
   }
   const t = acao.task || {};
-  if (!t.title) return 'Qual é o nome da atividade?';
-  if (!t.subject) return 'Qual é a matéria?';
-  if (!dataValida(t.dueDate)) return 'Qual é a data de entrega? Use dia/mês/ano.';
+  if (!t.title) return t.type === 'study' ? 'Qual assunto você quer estudar?' : 'Qual é o nome da atividade?';
+  if (!t.subject && t.type !== 'study') return 'Qual é a matéria?';
+  if (!dataValida(t.dueDate)) return t.type === 'study' ? 'Até quando você quer estudar esse assunto? Use dia/mês/ano.' : 'Qual é a data de entrega? Use dia/mês/ano.';
   return 'O que você quer mudar: nome, data ou matéria?';
 }
 function respostaSocial(texto, pendente = null) {
@@ -150,7 +161,8 @@ class ServicoAssistente {
     };
     let resposta;
     if (acao.intent === 'create_task') {
-      if (acao.task.title && acao.task.subject && dataValida(acao.task.dueDate)) {
+      const estudoCompleto = acao.task.type === 'study' && acao.task.title && dataValida(acao.task.dueDate);
+      if (estudoCompleto || (acao.task.title && acao.task.subject && dataValida(acao.task.dueDate))) {
         if (acao.task.dueTime && !horarioValido(acao.task.dueTime)) acao.task.dueTime = null;
         // Reserva a ação contra duplicidade e registra na mesma mensagem, sem confirmação visível.
         acao.stage = 'confirm';
@@ -395,17 +407,24 @@ class ServicoAssistente {
           ? { ...proposta.data, intent: 'edit_task', reference: null }
           : proposta.success ? proposta.data : null;
         if (interpretacao.intent === 'unavailable') resposta = FALHA;
-        else if (!propostaAtual || propostaAtual.intent === 'unknown') resposta = FORA_ESCOPO;
+        else if (!propostaAtual) resposta = FORA_ESCOPO;
+        else if (propostaAtual.intent === 'general_chat') resposta = respostaConversacional(propostaAtual.response);
+        else if (propostaAtual.intent === 'unknown') resposta = FORA_ESCOPO;
         else if (CONSULTAS.includes(propostaAtual.intent)) resposta = await this.consultar(usuario, conversa, propostaAtual.intent, new Date(recebidoEm));
         else resposta = await this.preparar(usuario, conversa, propostaAtual, pendente);
       }
     } catch { resposta = FALHA; }
     await this.repositorio.atualizarMensagem(mensagem.id, { statusProcessamento: 'processado', metadados: { generation: interpretacao?.generation || null, response: resposta } });
-    await this.repositorio.salvarMensagem({ conversaId: conversa.id, direcao: 'saida', conteudo: resposta, statusProcessamento: 'processado' });
+    const mensagemSaida = await this.repositorio.salvarMensagem({ conversaId: conversa.id, direcao: 'saida', conteudo: resposta, statusProcessamento: 'aguardando_envio' });
     try {
-      await this.servicoWhatsapp.enviarResposta(telefone, resposta);
+      const envio = await this.servicoWhatsapp.enviarResposta(telefone, resposta);
+      await this.repositorio.atualizarMensagem(mensagemSaida.id, {
+        statusProcessamento: 'enviada', enviadoEm: new Date(),
+        identificadorMensagemExterna: extrairIdEnvio(envio)
+      });
       await this.repositorio.atualizarMensagem(mensagem.id, { statusProcessamento: 'respondido' });
     } catch (erro) {
+      await this.repositorio.atualizarMensagem(mensagemSaida.id, { statusProcessamento: 'falhou', falhouEm: new Date(), codigoErro: erro.code || 'ENVIO_WHATSAPP' });
       await this.repositorio.atualizarMensagem(mensagem.id, { statusProcessamento: 'falhou' });
       throw erro;
     }

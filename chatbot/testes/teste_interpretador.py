@@ -70,6 +70,39 @@ class TesteInterpretador(unittest.TestCase):
         self.assertIsNone(resposta.reference)
         self.assertEqual(resposta.task.subject, "Banco De Dados")
 
+    def test_cria_assunto_de_estudo_sem_exigir_materia(self):
+        resposta = interpretar(self.requisicao("quero estudar normalização até 20/10/2026 às 18h"))
+        self.assertEqual(resposta.intent, "create_task")
+        self.assertEqual(resposta.task.type, "study")
+        self.assertEqual(resposta.task.title, "Estudar Normalização")
+        self.assertEqual(resposta.task.dueDate, "2026-10-20")
+        self.assertEqual(resposta.task.dueTime, "18:00")
+        self.assertEqual(resposta.missingFields, [])
+
+    def test_assunto_de_estudo_pendente_coleta_data(self):
+        pendente = {"intent": "create_task", "task": {"title": "Estudar Algoritmos", "type": "study", "dueDate": None}}
+        resposta = interpretar(self.requisicao("dia 22/10/2026", pendente))
+        self.assertEqual(resposta.intent, "create_task")
+        self.assertEqual(resposta.task.type, "study")
+        self.assertEqual(resposta.task.title, "Estudar Algoritmos")
+        self.assertEqual(resposta.task.dueDate, "2026-10-22")
+
+    def test_conversa_geral_nao_vira_mutacao(self):
+        resposta = interpretar(self.requisicao("me explica normalização"))
+        self.assertEqual(resposta.intent, "general_chat")
+        self.assertIn("organizar", resposta.response)
+
+    def test_pergunta_sobre_como_estudar_nao_cria_tarefa(self):
+        resposta = interpretar(self.requisicao("como estudar normalização melhor?"))
+        self.assertEqual(resposta.intent, "general_chat")
+        self.assertIsNone(resposta.task)
+
+    def test_preserva_assunto_quando_estudo_e_para_uma_prova(self):
+        resposta = interpretar(self.requisicao("quero estudar para a prova de matemática até 20/10/2026"))
+        self.assertEqual(resposta.intent, "create_task")
+        self.assertEqual(resposta.task.title, "Estudar Para A Prova De Matemática")
+        self.assertEqual(resposta.task.dueDate, "2026-10-20")
+
 
 if __name__ == "__main__":
     unittest.main()

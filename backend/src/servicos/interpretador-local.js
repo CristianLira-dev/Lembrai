@@ -74,6 +74,17 @@ function extrairMateria(texto) {
   return titulo(achado[1].trim().replace(/[.,!?;]+$/g, ''));
 }
 
+function extrairAssuntoEstudo(texto) {
+  const achado = String(texto).match(/^\s*(?:(?:(?:pode\s+)?me\s+lembre\s+de|quero|preciso|vou|tenho\s+que)\s+)?(?:estudar|revisar|praticar|treinar)\s+(.+)/i)
+    || String(texto).match(/^\s*(?:(?:quero|preciso|vou)\s+)?(?:me\s+)?preparar\s+para\s+(.+)/i);
+  if (!achado) return null;
+  const assunto = achado[1]
+    .replace(/\s+(?:até|ate|no\s+dia|dia\s+\d|amanhã|amanha|hoje|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo|às|as\s+\d|\d{1,2}[/:]|para\s+(?:(?:o\s+)?dia\s+)?(?:\d|hoje|amanhã|amanha|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)).*$/i, '')
+    .replace(/[.,!?;]+$/g, '')
+    .trim();
+  return assunto ? titulo(assunto) : null;
+}
+
 function limparReferencia(valor = '') {
   const referencia = String(valor)
     .replace(/^(?:a|o|as|os)\s+/, '')
@@ -134,8 +145,24 @@ function interpretarLocal({ texto, recebidoEm = new Date(), fuso = 'America/Sao_
   const edicao = interpretarEdicao(texto, baixo, recebidoEm, fuso, pendente);
   if (edicao) return edicao;
 
+  const assuntoEstudo = extrairAssuntoEstudo(texto);
+  if (assuntoEstudo || pendente?.task?.type === 'study') {
+    const data = extrairData(texto, recebidoEm, fuso);
+    const horario = extrairHorario(texto);
+    const task = { type: 'study' };
+    if (assuntoEstudo) task.title = 'Estudar ' + assuntoEstudo;
+    if (data) task.dueDate = data;
+    if (horario) task.dueTime = horario;
+    return { intent: 'create_task', task, requiresConfirmation: false };
+  }
+
   const tipoEncontrado = TIPOS.find(([palavra]) => new RegExp(`\\b${palavra}\\b`).test(baixo));
-  if (!tipoEncontrado && pendente?.intent !== 'create_task') return { intent: 'unknown' };
+  if (!tipoEncontrado && pendente?.intent !== 'create_task') {
+    return {
+      intent: 'general_chat',
+      response: 'Entendi. Posso conversar brevemente sobre isso e, se ajudar, organizar o tema como um assunto de estudo com prazo e lembretes.'
+    };
+  }
 
   const existente = pendente?.task || {};
   const task = {};
@@ -155,4 +182,4 @@ function interpretarLocal({ texto, recebidoEm = new Date(), fuso = 'America/Sao_
   return { intent: 'create_task', task, requiresConfirmation: false };
 }
 
-module.exports = { interpretarLocal, extrairData, extrairHorario, extrairMateria, acaoSobreTarefa, interpretarEdicao };
+module.exports = { interpretarLocal, extrairData, extrairHorario, extrairMateria, extrairAssuntoEstudo, acaoSobreTarefa, interpretarEdicao };

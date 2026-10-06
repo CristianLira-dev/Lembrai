@@ -15,3 +15,5 @@ npm run dev
 Esse comando inicia o backend em modo memória e o frontend ao mesmo tempo. Depois acesse [http://localhost:5173](http://localhost:5173). Para usar o PostgreSQL do Supabase sem Redis, execute `npm run dev:sem-redis`. Consulte [`LEIA-ME.md`](LEIA-ME.md) para os demais modos de execução.
 
 A arquitetura completa está em [`docs/arquitetura-mvp.md`](docs/arquitetura-mvp.md). O Design System obrigatório está consolidado em [`docs/design-system-lembr-ai.md`](docs/design-system-lembr-ai.md).
+
+Para produção, use processos separados para API, worker e agendador. O guia de implantação segura está em [`docs/operacao-producao.md`](docs/operacao-producao.md). O modo sem Redis existe somente para desenvolvimento local.

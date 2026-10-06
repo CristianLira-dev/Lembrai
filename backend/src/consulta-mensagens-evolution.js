@@ -21,8 +21,16 @@ function obterJidContato(mensagem = {}) {
 
 function timestampEmMilissegundos(valor) {
   const numero = Number(valor);
-  if (!Number.isFinite(numero)) return 0;
-  return numero < 10_000_000_000 ? numero * 1000 : numero;
+  if (valor !== '' && Number.isFinite(numero)) {
+    const milissegundos = numero < 10_000_000_000 ? numero * 1000 : numero;
+    if (!Number.isNaN(new Date(milissegundos).getTime())) return milissegundos;
+  }
+  const data = Date.parse(valor);
+  return Number.isFinite(data) ? data : 0;
+}
+
+function timestampDaMensagem(mensagem = {}) {
+  return timestampEmMilissegundos(mensagem.messageTimestamp || mensagem.timestamp || mensagem.createdAt || mensagem.date_time);
 }
 
 function iniciarConsultaMensagensEvolution({
@@ -47,8 +55,8 @@ function iniciarConsultaMensagensEvolution({
       const mensagens = await servicoWhatsapp.buscarMensagensRecentes(50);
       const recebidas = mensagens
         .filter((mensagem) => mensagem?.key?.fromMe === false)
-        .filter((mensagem) => timestampEmMilissegundos(mensagem.messageTimestamp) >= inicioDaJanela)
-        .sort((a, b) => timestampEmMilissegundos(a.messageTimestamp) - timestampEmMilissegundos(b.messageTimestamp));
+        .filter((mensagem) => timestampDaMensagem(mensagem) >= inicioDaJanela)
+        .sort((a, b) => timestampDaMensagem(a) - timestampDaMensagem(b));
 
       for (const mensagem of recebidas) {
         const texto = extrairTextoMensagem(mensagem);
@@ -62,19 +70,29 @@ function iniciarConsultaMensagensEvolution({
           tipoEvento: 'MESSAGES_UPSERT',
           dados: { origem: 'polling', instanceId: mensagem.instanceId, key: mensagem.key }
         });
-        if (registro.duplicado) continue;
+        if (registro.duplicado) {
+          const status = registro.evento?.statusProcessamento;
+          const recebidoEm = Date.parse(registro.evento?.recebidoEm);
+          const recebidoParado = status === 'recebido' && Number.isFinite(recebidoEm) && recebidoEm <= agora() - 120_000;
+          if (status !== 'falhou' && !recebidoParado) continue;
+        }
 
-        await servicoAssistente.processarEntrada({
-          telefone,
-          nome: mensagem.pushName || 'Estudante',
-          texto,
-          identificadorExterno: identificador,
-          recebidoEm: timestampEmMilissegundos(mensagem.messageTimestamp)
-            ? new Date(timestampEmMilissegundos(mensagem.messageTimestamp)).toISOString()
-            : new Date().toISOString(),
-          evento: mensagem
-        });
-        processadas += 1;
+        try {
+          const resultado = await servicoAssistente.processarEntrada({
+            telefone,
+            nome: mensagem.pushName || 'Estudante',
+            texto,
+            identificadorExterno: identificador,
+            recebidoEm: timestampDaMensagem(mensagem)
+              ? new Date(timestampDaMensagem(mensagem)).toISOString()
+              : new Date().toISOString()
+          });
+          await repositorio.atualizarEventoWebhook?.(registro.evento?.id, { statusProcessamento: 'concluido' });
+          if (!resultado?.duplicado || resultado?.reenviado) processadas += 1;
+        } catch (erro) {
+          await repositorio.atualizarEventoWebhook?.(registro.evento?.id, { statusProcessamento: 'falhou' });
+          logger.error({ erro: erro.message, codigo: erro.code }, 'falha ao recuperar mensagem individual da Evolution');
+        }
       }
 
       if (processadas) logger.info({ processadas }, 'mensagens recuperadas pelo fallback da Evolution');
@@ -114,4 +132,4 @@ function iniciarConsultaMensagensEvolution({
   };
 }
 
-module.exports = { diagnosticoConsultaEvolution, iniciarConsultaMensagensEvolution, obterJidContato, timestampEmMilissegundos };
+module.exports = { diagnosticoConsultaEvolution, iniciarConsultaMensagensEvolution, obterJidContato, timestampEmMilissegundos, timestampDaMensagem };

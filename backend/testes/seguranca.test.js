@@ -23,10 +23,18 @@ test('aceita a apikey enviada no corpo pela Evolution', () => {
   assert.equal(res.statusCode, null);
 });
 
+test('aceita apikey em envelope alternativo da Evolution', () => {
+  const req = { body: [{ body: { data: { data: { apikey: 'chave-da-evolution' } } } }], headers: {} };
+  const res = resposta();
+  let passou = false;
+  validarSegredoWebhook(req, res, () => { passou = true; });
+  assert.equal(passou, true);
+  assert.equal(res.statusCode, null);
+});
+
 test('rejeita webhook sem segredo válido', () => {
   const req = { body: { apikey: 'chave-incorreta' }, headers: {} };
   const res = resposta();
   validarSegredoWebhook(req, res, () => { throw new Error('não deveria liberar'); });
   assert.equal(res.statusCode, 401);
 });
-

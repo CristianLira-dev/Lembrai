@@ -23,16 +23,24 @@ function criarAutenticador(servicoAutenticacao) {
   };
 }
 
+function autorizarAdministrador(req, res, proximo) {
+  if (!req.perfil?.administrador) return res.status(403).json({ erro: 'Acesso administrativo necessário' });
+  return proximo();
+}
+
 function validarSegredoWebhook(req, res, proximo) {
   // A Evolution envia a apikey no corpo do evento. O painel Manager não expõe
   // um campo para cabeçalhos personalizados, então aceitamos também o segredo
   // configurado no header quando a configuração é feita pela API.
+  const envelope = Array.isArray(req.body) ? req.body[0] : (req.body || {});
+  const corpo = envelope.body && typeof envelope.body === 'object' ? envelope.body : envelope;
+  const apikeyCorpo = corpo.apikey || corpo.apiKey || corpo.data?.apikey || corpo.data?.data?.apikey;
   const token = req.headers['x-webhook-secret']
     || req.headers.authorization?.replace(/^Bearer\s+/i, '')
-    || req.body?.apikey;
+    || apikeyCorpo;
   if (ambiente.ambiente === 'desenvolvimento' && !process.env.EVOLUTION_WEBHOOK_SEGREDO) return proximo();
   const headerValido = compararSegredos(token, ambiente.evolutionWebhookSegredo);
-  const apikeyValida = compararSegredos(req.body?.apikey, ambiente.evolutionChave);
+  const apikeyValida = compararSegredos(apikeyCorpo, ambiente.evolutionChave);
   if (!headerValido && !apikeyValida) return res.status(401).json({ erro: 'Webhook não autorizado' });
   return proximo();
 }
@@ -47,4 +55,4 @@ function tratarErros(erro, req, res, proximo) {
   return res.status(status).json({ erro: mensagem, ...(erro.detalhes ? { detalhes: erro.detalhes } : {}) });
 }
 
-module.exports = { criarAutenticador, validarSegredoWebhook, tratarErros };
+module.exports = { criarAutenticador, autorizarAdministrador, validarSegredoWebhook, tratarErros };

@@ -1102,6 +1102,33 @@ h3 {
     }
 }
 
+.estudos-grade {
+    align-items: start;
+}
+
+.plano-estudo {
+    padding: 18px 0;
+    border-bottom: 1px solid var(--app-borda);
+}
+
+.plano-estudo:last-child {
+    border-bottom: 0;
+}
+
+.sessoes-estudo {
+    margin-top: 14px;
+}
+
+.sessoes-estudo .item-tarefa {
+    padding: 11px 0;
+}
+
+@media (max-width: 760px) {
+    .estudos-grade {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Landing page — Appwrite Dark Developer */
 .landing-page {
     --ds-bg: #19191c;

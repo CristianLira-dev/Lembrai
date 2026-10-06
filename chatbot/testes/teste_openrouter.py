@@ -65,6 +65,37 @@ class TesteOpenRouter(unittest.TestCase):
         self.assertEqual(resposta.intent, "create_task")
         self.assertEqual(resposta.generation["status"], "fallback")
 
+    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "teste", "OPENROUTER_MODEL": "openrouter/free"}, clear=False)
+    def test_retorna_conversa_geral_sem_criar_tarefa(self):
+        def transporte(payload, chave):
+            conteudo = {
+                "intent": "general_chat", "confidence": 0.91, "title": None,
+                "subject": None, "dueDate": None, "dueTime": None,
+                "type": "other", "reference": None, "reminderTime": None,
+                "response": "Normalização reduz repetição e melhora a consistência dos dados."
+            }
+            return {"id": "gen-chat", "model": "modelo-gratis", "choices": [{"message": {"content": json.dumps(conteudo)}}]}
+
+        resposta = processar(self.requisicao("me explica normalização"), transporte)
+        self.assertEqual(resposta.intent, "general_chat")
+        self.assertIn("reduz repetição", resposta.response)
+        self.assertIsNone(resposta.task)
+
+    @patch.dict(os.environ, {"OPENROUTER_API_KEY": "teste", "OPENROUTER_MODEL": "openrouter/free"}, clear=False)
+    def test_nao_repassa_resposta_de_baixa_confianca(self):
+        def transporte(payload, chave):
+            conteudo = {
+                "intent": "general_chat", "confidence": 0.2, "title": None,
+                "subject": None, "dueDate": None, "dueTime": None,
+                "type": "other", "reference": None, "reminderTime": None,
+                "response": "resposta que não deve ser repassada"
+            }
+            return {"id": "gen-baixa", "model": "modelo-gratis", "choices": [{"message": {"content": json.dumps(conteudo)}}]}
+
+        resposta = processar(self.requisicao("mensagem ambígua"), transporte)
+        self.assertEqual(resposta.intent, "unknown")
+        self.assertNotIn("não deve ser repassada", resposta.response)
+
 
 if __name__ == "__main__":
     unittest.main()

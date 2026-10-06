@@ -1,0 +1,61 @@
+name: Validacao
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: backend/package-lock.json }
+      - run: npm ci
+        working-directory: backend
+      - run: npm test
+        working-directory: backend
+      - run: npm audit --omit=dev --audit-level=high
+        working-directory: backend
+      - run: docker build -t lembrai-backend ./backend
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontend/package-lock.json }
+      - run: npm ci
+        working-directory: frontend
+      - run: npm test
+        working-directory: frontend
+      - run: npm audit --omit=dev --audit-level=high
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+
+  chatbot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13', cache: pip, cache-dependency-path: chatbot/requisitos.txt }
+      - run: pip install -r requisitos.txt
+        working-directory: chatbot
+      - run: python -m unittest discover -s testes -p 'teste_*.py'
+        working-directory: chatbot
+
+  repositorio-seguro:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - name: Impedir arquivos sensiveis
+        run: |
+          ! git ls-files | grep -E '(^|/)\.env($|\.)'
+          ! git ls-files | grep -E '^supabase/'
+          ! git grep -nE '(service_role|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|sk_live_)' -- ':!package-lock.json'

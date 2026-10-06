@@ -72,3 +72,35 @@ test('ignora histórico anterior à janela inicial e mensagens de grupos', async
   consulta.parar();
   assert.equal(entradas.length, 0);
 });
+
+test('aceita timestamp ISO e recupera evento anteriormente falho', async () => {
+  const agora = Date.now();
+  const evento = { id: 'evento-falho', statusProcessamento: 'falhou' };
+  let chamadas = 0;
+  const consulta = iniciarConsultaMensagensEvolution({
+    servicoWhatsapp: {
+      async buscarMensagensRecentes() {
+        return [{
+          key: { id: 'mensagem-falha', remoteJid: '5511999999999@s.whatsapp.net', fromMe: false },
+          message: { conversation: 'quero estudar algoritmos' },
+          createdAt: new Date(agora - 60_000).toISOString()
+        }];
+      }
+    },
+    repositorio: {
+      async registrarEventoWebhook() { return { duplicado: true, evento }; },
+      async atualizarEventoWebhook(id, dados) { Object.assign(evento, dados); return evento; }
+    },
+    servicoAssistente: {
+      async processarEntrada() { chamadas += 1; return { duplicado: true, reenviado: true }; }
+    },
+    intervaloMs: 60_000,
+    agora: () => agora
+  });
+
+  const resultado = await consulta.pronto;
+  consulta.parar();
+  assert.equal(resultado.processadas, 1);
+  assert.equal(chamadas, 1);
+  assert.equal(evento.statusProcessamento, 'concluido');
+});

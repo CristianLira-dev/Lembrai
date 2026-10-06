@@ -100,7 +100,6 @@ ChatBot-Tasks/
 │   │   └── principal.py
 │   ├── testes/
 │   └── requisitos.txt
-├── supabase/schema.sql
 ├── docs/arquitetura-mvp.md
 ├── package.json
 ├── scripts/iniciar-local.js
@@ -150,13 +149,13 @@ As intenções cobrem cadastro e consulta de matérias, cadastro, edição, conc
 
 ## 9. Calendários
 
-O serviço de calendários expõe um contrato comum para `conectar`, `desconectar`, `sincronizar`, `criarEvento`, `atualizarEvento` e `excluirEvento`. Os adaptadores iniciais são Google Calendar, Microsoft Outlook e um provedor ICS/simulado. URLs de autorização são iniciadas pelo backend, e callbacks trocam o código por tokens no servidor. Tokens são criptografados com AES-256-GCM quando a chave está configurada.
+O serviço de calendários expõe um contrato comum para `conectar`, `desconectar`, `sincronizar`, `criarEvento`, `atualizarEvento` e `excluirEvento`. Os adaptadores iniciais são Google Calendar, Microsoft Outlook e um provedor ICS/simulado. URLs de autorização são iniciadas pelo backend, e callbacks trocam o código por tokens no servidor. Tokens são criptografados com AES-256-GCM; em produção, a ausência da chave interrompe a inicialização e tokens legados em texto puro são recusados.
 
 Sem `GOOGLE_CLIENT_ID`, `OUTLOOK_CLIENT_ID` e respectivas chaves, o painel apresenta o provedor como “disponível para configuração” e o ambiente não finge que existe uma conexão real. Essa decisão torna o MVP executável sem credenciais e evita armazenar senhas de serviços externos.
 
 ## 10. Filas, lembretes e resumo diário
 
-O Redis sustenta as filas BullMQ `processamento-mensagens`, `processamento-lembretes`, `sincronizacao-calendarios`, `envio-whatsapp` e `resumo-diario`. O webhook não mantém requisição aberta. O worker de lembretes confirma que a tarefa continua pendente, envia a mensagem, atualiza o status e aplica tentativas com backoff. O resumo de pendências é enviado diariamente pelo Node.js, no horário configurado pelo usuário, enquanto houver atividades pendentes.
+O Valkey/Redis sustenta as filas BullMQ `processamento-mensagens`, `processamento-lembretes`, `sincronizacao-calendarios`, `envio-whatsapp` e `resumo-diario`, além dos locks do agendador e do rate limiting distribuído. O webhook não mantém requisição aberta. O worker de lembretes confirma que a tarefa continua pendente, envia a mensagem, atualiza o status e aplica tentativas com backoff. O resumo de pendências é enviado diariamente no horário e frequência configurados pelo usuário.
 
 ## 11. Rotas do backend
 
@@ -187,7 +186,7 @@ As telas são `/`, `/entrar`, `/cadastro`, `/painel`, `/tarefas`, `/tarefas/nova
 
 ## 13. Segurança
 
-O backend usa Helmet, CORS configurável, limite de requisições, Zod, logs estruturados, timeout no chatbot, segredo de serviço, segredo de webhook e criptografia opcional de tokens. Segredos entram somente por ambiente. A chave secreta do Supabase fica restrita ao backend. Em produção, os serviços devem operar atrás de HTTPS, com Redis privado e rotação de chaves.
+O backend usa Helmet, CORS configurável, rate limiting distribuído, Zod, logs estruturados, timeout no chatbot, segredo de serviço, segredo de webhook e criptografia obrigatória de tokens. Segredos entram somente por ambiente. A chave secreta do Supabase fica restrita ao backend. Em produção, a ausência de configuração crítica impede a inicialização.
 
 ## 14. Plano de implementação
 

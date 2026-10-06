@@ -30,7 +30,18 @@ export const api = {
   conexoesCalendario: () => requisitar('/calendarios/conexoes'),
   conectarCalendario: (provedor) => requisitar(`/calendarios/${provedor}/conectar`),
   desconectarCalendario: (provedor) => requisitar(`/calendarios/${provedor}/desconectar`, { metodo: 'DELETE' }),
-  sincronizarCalendario: (provedor) => requisitar(`/calendarios/${provedor}/sincronizar`, { metodo: 'POST' })
+  sincronizarCalendario: (provedor) => requisitar(`/calendarios/${provedor}/sincronizar`, { metodo: 'POST' }),
+  preferencias: () => requisitar('/preferencias'),
+  salvarPreferencias: (dados) => requisitar('/preferencias', { metodo: 'PATCH', dados }),
+  exportarDados: () => requisitar('/privacidade/exportar'),
+  solicitarExclusao: () => requisitar('/privacidade/excluir-conta', { metodo: 'POST' }),
+  planosEstudo: () => requisitar('/estudos/planos'),
+  criarPlanoEstudo: (dados) => requisitar('/estudos/planos', { metodo: 'POST', dados }),
+  atualizarPlanoEstudo: (id, dados) => requisitar(`/estudos/planos/${id}`, { metodo: 'PATCH', dados }),
+  concluirSessaoEstudo: (id) => requisitar(`/estudos/sessoes/${id}/concluir`, { metodo: 'POST' }),
+  diagnosticoAdmin: () => requisitar('/admin/diagnostico'),
+  reprocessarWebhook: (id) => requisitar(`/admin/webhooks/${id}/reprocessar`, { metodo: 'POST' }),
+  broadcastAdmin: (mensagem) => requisitar('/admin/broadcast', { metodo: 'POST', dados: { mensagem } })
 };
 
 export default api;

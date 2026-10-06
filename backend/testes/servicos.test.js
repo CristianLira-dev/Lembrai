@@ -280,11 +280,50 @@ test('alteração do horário padrão exige confirmação', async () => {
   assert.equal((await cenario.repositorio.buscarUsuarioPorId(usuario.id)).horarioLembretes, '08:30');
 });
 
-test('assunto fora do escopo recebe apenas a resposta definida', async () => {
-  const cenario = criarCenario([{ intent: 'unknown', confidence: 0.99 }]);
+test('conversa geral usa resposta flexível sem executar uma ação', async () => {
+  const cenario = criarCenario([{ intent: 'general_chat', confidence: 0.99, response: 'Normalização organiza os dados para reduzir repetição e inconsistências. Posso também registrar esse tema para estudo.' }]);
   const usuario = await criarUsuario(cenario);
   const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'me explica normalização', identificadorExterno: 'x-1' });
+  assert.match(resultado.resposta, /Normalização organiza os dados/);
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 0);
+});
+
+test('resposta conversacional inválida usa orientação segura', async () => {
+  const cenario = criarCenario([{ intent: 'general_chat', confidence: 0.99, response: 'x'.repeat(700) }]);
+  const usuario = await criarUsuario(cenario);
+  const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto: 'vamos conversar', identificadorExterno: 'x-2' });
   assert.equal(resultado.resposta, FORA_ESCOPO);
+});
+
+test('fallback local organiza assunto de estudo e pergunta apenas a data ausente', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+
+  const primeira = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'quero estudar normalização', identificadorExterno: 'estudo-1'
+  });
+  assert.match(primeira.resposta, /Até quando você quer estudar esse assunto/);
+
+  const segunda = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'dia 20/10/2027 às 18h', identificadorExterno: 'estudo-2'
+  });
+  assert.match(segunda.resposta, /Estudar Normalização organizado para estudo até o dia 20\/10\/2027 às 18:00/);
+  const tarefas = await cenario.tarefas.listar(usuario.id);
+  assert.equal(tarefas.length, 1);
+  assert.equal(tarefas[0].tipo, 'estudo');
+  assert.equal(tarefas[0].materia, null);
+});
+
+test('pergunta sobre como estudar não cria tarefa por engano no fallback', async () => {
+  const cenario = criarCenario();
+  cenario.chatbot.processar = async () => { throw new Error('chatbot indisponível'); };
+  const usuario = await criarUsuario(cenario);
+  const resultado = await cenario.assistente.processarEntrada({
+    telefone: usuario.telefone, texto: 'como estudar normalização melhor?', identificadorExterno: 'estudo-pergunta'
+  });
+  assert.equal(resultado.interpretacao.intent, 'general_chat');
+  assert.equal((await cenario.tarefas.listar(usuario.id)).length, 0);
 });
 
 test('saudações, inclusive informais, recebem apresentação sem consultar o classificador', async () => {
@@ -292,8 +331,8 @@ test('saudações, inclusive informais, recebem apresentação sem consultar o c
   const usuario = await criarUsuario(cenario);
   for (const [indice, texto] of ['ola', 'Olá!', 'oi, tudo bem?', 'bom dia', 'Boa noite, Lembraí', 'e aí?', 'eae', 'salve', 'fala aí'].entries()) {
     const resultado = await cenario.assistente.processarEntrada({ telefone: usuario.telefone, texto, identificadorExterno: `saudacao-${indice}` });
-    assert.match(resultado.resposta, /Sou a Lembraí.*atividades e prazos/);
-    assert.match(resultado.resposta, /cadastrar.*editar.*concluir.*remover atividades.*mostrar pendências.*ajustar lembretes/);
+    assert.match(resultado.resposta, /Sou a Lembraí.*atividades, estudos e prazos/);
+    assert.match(resultado.resposta, /organizar assuntos para estudar.*cadastrar atividades.*mostrar pendências.*ajustar lembretes/);
   }
   assert.equal(cenario.chatbot.chamadas, 0);
 });

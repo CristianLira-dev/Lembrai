@@ -10,5 +10,6 @@ coverage/
 .env.*
 .prisma/
 supabase/.temp/
+supabase/
 
 .env

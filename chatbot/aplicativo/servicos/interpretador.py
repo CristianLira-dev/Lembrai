@@ -6,7 +6,7 @@ from datetime import date
 from aplicativo.entidades.datas import combinar_data_horario, extrair_data, extrair_horario
 from aplicativo.esquemas.modelos import RequisicaoProcessamento, RespostaProcessamento, TarefaInterpretada
 
-FORA_ESCOPO = "Esse assunto eu não consigo ajudar por aqui. Mas posso cadastrar, editar, concluir ou remover atividades e mostrar suas pendências!"
+FORA_ESCOPO = "Posso conversar brevemente sobre isso e também organizar o tema como um assunto de estudo com prazo e lembretes."
 FALHA_IA = "Não consegui entender agora. Tenta de novo em instantes?"
 TIPOS = {"prova": ("exam", "Prova"), "trabalho": ("assignment", "Trabalho"), "tarefa": ("task", "Tarefa"), "atividade": ("task", "Atividade"), "seminário": ("other", "Seminário"), "aula": ("class", "Aula")}
 
@@ -52,6 +52,21 @@ def acao_sobre_tarefa(baixo: str):
     return None
 
 
+def extrair_assunto_estudo(texto: str) -> str | None:
+    achado = re.search(r"^\s*(?:(?:(?:pode\s+)?me\s+lembre\s+de|quero|preciso|vou|tenho\s+que)\s+)?(?:estudar|revisar|praticar|treinar)\s+(.+)", texto, re.IGNORECASE)
+    if not achado:
+        achado = re.search(r"^\s*(?:(?:quero|preciso|vou)\s+)?(?:me\s+)?preparar\s+para\s+(.+)", texto, re.IGNORECASE)
+    if not achado:
+        return None
+    assunto = re.sub(
+        r"\s+(?:até|ate|no\s+dia|dia\s+\d|amanhã|amanha|hoje|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo|às|as\s+\d|\d{1,2}[/:]|para\s+(?:(?:o\s+)?dia\s+)?(?:\d|hoje|amanhã|amanha|segunda|terça|terca|quarta|quinta|sexta|sábado|sabado|domingo)).*$",
+        "",
+        achado.group(1),
+        flags=re.IGNORECASE,
+    ).strip(" .,!?:;")
+    return assunto.title() if assunto else None
+
+
 def interpretar_edicao(req: RequisicaoProcessamento, texto: str, baixo: str, pendente: dict):
     comando = re.match(r"^(?:quero\s+)?(?:mudar|mude|alterar|altere|editar|edite|trocar|troque)\s*(.*)$", baixo)
     if not comando and pendente.get("intent") != "edit_task":
@@ -86,9 +101,6 @@ def interpretar(req: RequisicaoProcessamento) -> RespostaProcessamento:
     comando = comando_explicito(texto)
     if comando:
         return resultado(comando)
-    # Palavras acadêmicas em uma pergunta geral não autorizam criar atividades.
-    if re.search(r"\b(explique|explica|resolva|resolve|normalizacao|ignore.*instruc|piada|noticias|opiniao)\b", baixo):
-        return resultado("unknown", response=FORA_ESCOPO)
     pendente = req.context.pendingAction or {}
     dados = pendente.get("task") or {}
     data, _ = extrair_data(texto, req.user.timezone, req.message.receivedAt)
@@ -121,9 +133,24 @@ def interpretar(req: RequisicaoProcessamento) -> RespostaProcessamento:
     edicao = interpretar_edicao(req, texto, baixo, pendente)
     if edicao:
         return edicao
+    assunto_estudo = extrair_assunto_estudo(texto)
+    if assunto_estudo or (pendente.get("task") or {}).get("type") == "study":
+        tarefa = TarefaInterpretada(**dados)
+        tarefa.type = "study"
+        if assunto_estudo:
+            tarefa.title = f"Estudar {assunto_estudo}"
+        if data:
+            tarefa.dueDate = data.isoformat()
+        if horario:
+            tarefa.dueTime = horario
+        if tarefa.dueDate:
+            tarefa.dueDateTime = combinar_data_horario(date.fromisoformat(tarefa.dueDate), tarefa.dueTime, req.user.timezone)
+        faltantes = [campo for campo in ("title", "dueDate") if not getattr(tarefa, campo)]
+        perguntas = {"title": "Qual assunto você quer estudar?", "dueDate": "Até quando você quer estudar esse assunto?"}
+        return resultado("create_task", task=tarefa, requiresConfirmation=False, missingFields=faltantes, response=perguntas[faltantes[0]] if faltantes else "")
     tipo, rotulo = next((valor for chave, valor in TIPOS.items() if re.search(rf"\b{sem_acentos(chave)}\b", baixo)), ("task", ""))
     if not rotulo and pendente.get("intent") != "create_task":
-        return resultado("unknown", response=FORA_ESCOPO)
+        return resultado("general_chat", confidence=0.7, response=FORA_ESCOPO)
     if pendente.get("intent") == "create_task":
         tarefa = TarefaInterpretada(**dados)
         if data:

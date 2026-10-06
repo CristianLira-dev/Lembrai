@@ -14,6 +14,12 @@ function normalizarTarefa(tarefa) {
   return { ...tarefa, dataEntrega: dataIso(tarefa.dataEntrega) };
 }
 
+function removerCampoSenha(usuario) {
+  if (!usuario) return usuario;
+  const { senhaCriptografada, ...seguro } = usuario;
+  return seguro;
+}
+
 class RepositorioMemoria {
   constructor() {
     this.usuarios = [];
@@ -27,6 +33,8 @@ class RepositorioMemoria {
     this.registros = [];
     this.materias = [];
     this.codigosVerificacao = [];
+    this.planosEstudo = [];
+    this.sessoesEstudo = [];
   }
 
   async verificarConexao() { return true; }
@@ -37,6 +45,7 @@ class RepositorioMemoria {
   async listarUsuariosComTarefasPendentes() {
     return this.usuarios.filter((usuario) => this.tarefas.some((tarefa) => tarefa.usuarioId === usuario.id && tarefa.status === 'pendente'));
   }
+  async listarUsuariosAtivosComTelefone() { return this.usuarios.filter((usuario) => usuario.telefone && usuario.notificacoesAtivas !== false && !usuario.exclusaoSolicitadaEm); }
   async listarUsuariosInativos(ate = new Date()) {
     return this.usuarios.filter((usuario) => usuario.telefone
       && usuario.ultimaAtividadeRegistradaEm
@@ -44,6 +53,8 @@ class RepositorioMemoria {
       && !usuario.ultimoAvisoInatividadeEm);
   }
   async atualizarUsuario(id, dados) { const usuario = await this.buscarUsuarioPorId(id); if (!usuario) return null; Object.assign(usuario, dados, { atualizadoEm: new Date() }); return usuario; }
+  async listarUsuariosExclusaoVencida(ate) { return this.usuarios.filter((u) => u.exclusaoSolicitadaEm && new Date(u.exclusaoSolicitadaEm) <= ate); }
+  async excluirUsuario(id) { const indice = this.usuarios.findIndex((u) => u.id === id); if (indice < 0) return false; this.usuarios.splice(indice, 1); this.tarefas = this.tarefas.filter((x) => x.usuarioId !== id); this.lembretes = this.lembretes.filter((x) => x.usuarioId !== id); this.conversas = this.conversas.filter((x) => x.usuarioId !== id); this.planosEstudo = this.planosEstudo.filter((x) => x.usuarioId !== id); this.sessoesEstudo = this.sessoesEstudo.filter((x) => x.usuarioId !== id); return true; }
   async listarMaterias(usuarioId) { return this.materias.filter((item) => item.usuarioId === usuarioId); }
   async criarMateria(usuarioId, nome) { const normalizado = nome.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); const existente = this.materias.find((item) => item.usuarioId === usuarioId && item.normalizado === normalizado); if (existente) return existente; const materia = { id: criarId('mat'), usuarioId, nome: nome.trim(), normalizado }; this.materias.push(materia); return materia; }
   async criarUsuario(dados) {
@@ -135,6 +146,35 @@ class RepositorioMemoria {
   async listarConversas(usuarioId) { return this.conversas.filter((item) => item.usuarioId === usuarioId).map((item) => ({ ...item, mensagens: undefined })); }
   async listarMensagens(usuarioId, conversaId) { const conversa = this.conversas.find((item) => item.id === conversaId && item.usuarioId === usuarioId); return conversa ? this.mensagens.filter((item) => item.conversaId === conversaId).sort((a, b) => a.criadoEm - b.criadoEm) : null; }
   async registrarEventoWebhook(dados) { const chave = `${dados.provedor}:${dados.identificadorEventoExterno}`; if (this.webhooks.some((item) => item.chave === chave)) return { duplicado: true, evento: this.webhooks.find((item) => item.chave === chave) }; const evento = { id: criarId('whk'), chave, recebidoEm: new Date(), statusProcessamento: 'recebido', ...dados }; this.webhooks.push(evento); return { duplicado: false, evento }; }
+  async atualizarEventoWebhook(id, dados) { const evento = this.webhooks.find((item) => item.id === id); if (evento) Object.assign(evento, dados); return evento || null; }
+  async buscarEventoWebhook(id) { return this.webhooks.find((item) => item.id === id) || null; }
+  async listarFalhasOperacionais() {
+    return {
+      webhooks: this.webhooks.filter((item) => item.statusProcessamento === 'falhou').slice(-50),
+      mensagens: this.mensagens.filter((item) => ['falhou', 'nao_entregue'].includes(item.statusProcessamento)).slice(-50)
+    };
+  }
+  async metricasOperacionais() { return { usuarios: this.usuarios.length, tarefas: this.tarefas.length, mensagens: this.mensagens.length, webhooksFalhos: this.webhooks.filter((x) => x.statusProcessamento === 'falhou').length, mensagensFalhas: this.mensagens.filter((x) => ['falhou', 'nao_entregue'].includes(x.statusProcessamento)).length }; }
+  async buscarMensagemPorIdentificadorExterno(identificador) { return this.mensagens.find((m) => m.identificadorMensagemExterna === identificador) || null; }
+  async excluirMensagensAntigas(dias, agora = new Date()) {
+    const limite = agora.getTime() - dias * 86400000;
+    const antes = this.mensagens.length;
+    this.mensagens = this.mensagens.filter((m) => new Date(m.criadoEm).getTime() >= limite);
+    return antes - this.mensagens.length;
+  }
+
+  async criarPlanoEstudo(dados) { const item = { id: criarId('plano'), status: 'ativo', criadoEm: new Date(), atualizadoEm: new Date(), ...dados }; this.planosEstudo.push(item); return item; }
+  async listarPlanosEstudo(usuarioId) { return this.planosEstudo.filter((p) => p.usuarioId === usuarioId); }
+  async buscarPlanoEstudo(usuarioId, id) { return this.planosEstudo.find((p) => p.usuarioId === usuarioId && p.id === id) || null; }
+  async atualizarPlanoEstudo(usuarioId, id, dados) { const item = await this.buscarPlanoEstudo(usuarioId, id); if (!item) return null; Object.assign(item, dados, { atualizadoEm: new Date() }); return item; }
+  async criarSessaoEstudo(dados) { const item = { id: criarId('sessao'), status: 'agendada', criadoEm: new Date(), ...dados }; this.sessoesEstudo.push(item); return item; }
+  async listarSessoesEstudo(usuarioId, planoEstudoId) { return this.sessoesEstudo.filter((s) => s.usuarioId === usuarioId && (!planoEstudoId || s.planoEstudoId === planoEstudoId)); }
+  async atualizarSessaoEstudo(usuarioId, id, dados) { const item = this.sessoesEstudo.find((s) => s.usuarioId === usuarioId && s.id === id); if (!item) return null; Object.assign(item, dados); return item; }
+  async listarSessoesEstudoPendentes(ate = new Date()) { return this.sessoesEstudo.filter((s) => s.status === 'agendada' && new Date(s.agendadaPara) <= ate); }
+  async exportarDados(usuarioId) {
+    const usuario = await this.buscarUsuarioPorId(usuarioId);
+    return { usuario: removerCampoSenha(usuario), tarefas: await this.listarTarefas(usuarioId), lembretes: await this.listarLembretes(usuarioId), planosEstudo: await this.listarPlanosEstudo(usuarioId), sessoesEstudo: await this.listarSessoesEstudo(usuarioId) };
+  }
 
   async listarConexoes(usuarioId) { return this.conexoes.filter((item) => item.usuarioId === usuarioId); }
   async buscarConexao(usuarioId, provedor) { return this.conexoes.find((item) => item.usuarioId === usuarioId && item.provedor === provedor) || null; }
@@ -142,6 +182,8 @@ class RepositorioMemoria {
   async excluirConexao(usuarioId, provedor) { const indice = this.conexoes.findIndex((item) => item.usuarioId === usuarioId && item.provedor === provedor); if (indice < 0) return false; this.conexoes.splice(indice, 1); return true; }
   async criarEventoCalendario(dados) { const item = { id: criarId('evt'), criadoEm: new Date(), atualizadoEm: new Date(), ...dados }; this.eventos.push(item); return item; }
   async listarEventosTarefa(usuarioId, tarefaId) { return this.eventos.filter((e) => e.usuarioId === usuarioId && e.tarefaId === tarefaId); }
+  async buscarEventoExterno(usuarioId, provedor, identificadorEventoExterno) { return this.eventos.find((e) => e.usuarioId === usuarioId && e.provedor === provedor && e.identificadorEventoExterno === identificadorEventoExterno) || null; }
+  async excluirEventoCalendario(usuarioId, id) { const i = this.eventos.findIndex((e) => e.usuarioId === usuarioId && e.id === id); if (i < 0) return false; this.eventos.splice(i, 1); return true; }
   async atualizarEventoCalendario(usuarioId, id, dados) { const e = this.eventos.find((e) => e.usuarioId === usuarioId && e.id === id); if (e) Object.assign(e, dados); return e; }
   async criarRegistroSincronizacao(dados) { const item = { id: criarId('sync'), iniciadoEm: new Date(), ...dados }; this.registros.push(item); return item; }
 
@@ -219,6 +261,10 @@ class RepositorioSupabase {
       .eq('tarefas.status', 'pendente'));
     return data.map(({ tarefas, ...usuario }) => usuario);
   }
+  async listarUsuariosAtivosComTelefone() {
+    const { data } = await this.executar(this.criarCliente().from('Usuario').select('id,telefone').not('telefone', 'is', null).eq('notificacoesAtivas', true).is('exclusaoSolicitadaEm', null));
+    return data;
+  }
   async listarUsuariosInativos(ate = new Date()) {
     const { data } = await this.executar(this.criarCliente().from('Usuario')
       .select('*')
@@ -228,6 +274,8 @@ class RepositorioSupabase {
     return data;
   }
   async atualizarUsuario(id, dados) { const { data } = await this.executar(this.criarCliente().from('Usuario').update({ ...dados, atualizadoEm: dataIso() }).eq('id', id).select().maybeSingle()); return data; }
+  async listarUsuariosExclusaoVencida(ate) { return (await this.executar(this.criarCliente().from('Usuario').select('id').not('exclusaoSolicitadaEm', 'is', null).lte('exclusaoSolicitadaEm', dataIso(ate)))).data; }
+  async excluirUsuario(id) { return Boolean((await this.executar(this.criarCliente().from('Usuario').delete().eq('id', id).select('id').maybeSingle())).data); }
   async listarMaterias(usuarioId) { const { data } = await this.executar(this.criarCliente().from('Materia').select('*').eq('usuarioId', usuarioId).order('nome')); return data; }
   async criarMateria(usuarioId, nome) {
     const normalizado = nome.trim().normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -353,6 +401,49 @@ class RepositorioSupabase {
       return { duplicado: true, evento };
     }
   }
+  async atualizarEventoWebhook(id, dados) {
+    const { data } = await this.executar(this.criarCliente().from('EventoWebhook')
+      .update(dados).eq('id', id).select().maybeSingle());
+    return data;
+  }
+  async buscarEventoWebhook(id) { return this.buscarUm('EventoWebhook', { id }); }
+  async listarFalhasOperacionais() {
+    const [webhooks, mensagens] = await Promise.all([
+      this.executar(this.criarCliente().from('EventoWebhook').select('id,tipoEvento,statusProcessamento,recebidoEm,processadoEm').eq('statusProcessamento', 'falhou').order('recebidoEm', { ascending: false }).limit(50)),
+      this.executar(this.criarCliente().from('Mensagem').select('id,direcao,statusProcessamento,criadoEm,atualizadoEm,identificadorMensagemExterna').in('statusProcessamento', ['falhou', 'nao_entregue']).order('criadoEm', { ascending: false }).limit(50))
+    ]);
+    return { webhooks: webhooks.data, mensagens: mensagens.data };
+  }
+  async metricasOperacionais() {
+    const contar = async (tabela, filtro) => {
+      let consulta = this.criarCliente().from(tabela).select('*', { count: 'exact', head: true });
+      if (filtro) consulta = consulta.in(filtro.campo, filtro.valores);
+      return (await this.executar(consulta)).count || 0;
+    };
+    const [usuarios, tarefas, mensagens, webhooksFalhos, mensagensFalhas] = await Promise.all([
+      contar('Usuario'), contar('Tarefa'), contar('Mensagem'), contar('EventoWebhook', { campo: 'statusProcessamento', valores: ['falhou'] }), contar('Mensagem', { campo: 'statusProcessamento', valores: ['falhou', 'nao_entregue'] })
+    ]);
+    return { usuarios, tarefas, mensagens, webhooksFalhos, mensagensFalhas };
+  }
+  async buscarMensagemPorIdentificadorExterno(identificadorMensagemExterna) { return this.buscarUm('Mensagem', { identificadorMensagemExterna }); }
+  async excluirMensagensAntigas(dias, agora = new Date()) {
+    const limite = new Date(agora.getTime() - dias * 86400000).toISOString();
+    const { data } = await this.executar(this.criarCliente().from('Mensagem').delete().lt('criadoEm', limite).select('id'));
+    return data.length;
+  }
+
+  async criarPlanoEstudo(dados) { const agora = dataIso(); return this.inserir('PlanoEstudo', { id: criarId('plano'), status: 'ativo', criadoEm: agora, atualizadoEm: agora, ...dados, dataLimite: dataIso(dados.dataLimite) }); }
+  async listarPlanosEstudo(usuarioId) { const { data } = await this.executar(this.criarCliente().from('PlanoEstudo').select('*, sessoes:SessaoEstudo(*)').eq('usuarioId', usuarioId).order('dataLimite')); return data; }
+  async buscarPlanoEstudo(usuarioId, id) { return this.buscarUm('PlanoEstudo', { usuarioId, id }); }
+  async atualizarPlanoEstudo(usuarioId, id, dados) { const campos = { ...dados, atualizadoEm: dataIso(), ...(dados.dataLimite ? { dataLimite: dataIso(dados.dataLimite) } : {}) }; const { data } = await this.executar(this.criarCliente().from('PlanoEstudo').update(campos).eq('usuarioId', usuarioId).eq('id', id).select().maybeSingle()); return data; }
+  async criarSessaoEstudo(dados) { return this.inserir('SessaoEstudo', { id: criarId('sessao'), status: 'agendada', criadoEm: dataIso(), ...dados, agendadaPara: dataIso(dados.agendadaPara) }); }
+  async listarSessoesEstudo(usuarioId, planoEstudoId) { let consulta = this.criarCliente().from('SessaoEstudo').select('*').eq('usuarioId', usuarioId); if (planoEstudoId) consulta = consulta.eq('planoEstudoId', planoEstudoId); return (await this.executar(consulta.order('agendadaPara'))).data; }
+  async atualizarSessaoEstudo(usuarioId, id, dados) { const { data } = await this.executar(this.criarCliente().from('SessaoEstudo').update(dados).eq('usuarioId', usuarioId).eq('id', id).select().maybeSingle()); return data; }
+  async listarSessoesEstudoPendentes(ate = new Date()) { return (await this.executar(this.criarCliente().from('SessaoEstudo').select('*, plano:PlanoEstudo(*)').eq('status', 'agendada').lte('agendadaPara', dataIso(ate)).order('agendadaPara').limit(50))).data; }
+  async exportarDados(usuarioId) {
+    const [usuario, tarefas, lembretes, planosEstudo, sessoesEstudo] = await Promise.all([this.buscarUsuarioPorId(usuarioId), this.listarTarefas(usuarioId), this.listarLembretes(usuarioId), this.listarPlanosEstudo(usuarioId), this.listarSessoesEstudo(usuarioId)]);
+    return { usuario: usuario && removerCampoSenha(usuario), tarefas, lembretes, planosEstudo, sessoesEstudo };
+  }
 
   async listarConexoes(usuarioId) { const { data } = await this.executar(this.criarCliente().from('ConexaoCalendario').select('*').eq('usuarioId', usuarioId).order('provedor', { ascending: true })); return data; }
   async buscarConexao(usuarioId, provedor) { return this.buscarUm('ConexaoCalendario', { usuarioId, provedor }); }
@@ -369,6 +460,8 @@ class RepositorioSupabase {
   async excluirConexao(usuarioId, provedor) { const { data } = await this.executar(this.criarCliente().from('ConexaoCalendario').delete().eq('usuarioId', usuarioId).eq('provedor', provedor).select('id').maybeSingle()); return Boolean(data); }
   async criarEventoCalendario(dados) { const agora = dataIso(); return this.inserir('EventoCalendario', { id: criarId('evt'), criadoEm: agora, atualizadoEm: agora, ...dados, dataInicio: dataIso(dados.dataInicio), dataFim: dataIso(dados.dataFim) }); }
   async listarEventosTarefa(usuarioId, tarefaId) { const { data } = await this.executar(this.criarCliente().from('EventoCalendario').select('*').eq('usuarioId', usuarioId).eq('tarefaId', tarefaId)); return data; }
+  async buscarEventoExterno(usuarioId, provedor, identificadorEventoExterno) { return this.buscarUm('EventoCalendario', { usuarioId, provedor, identificadorEventoExterno }); }
+  async excluirEventoCalendario(usuarioId, id) { return Boolean((await this.executar(this.criarCliente().from('EventoCalendario').delete().eq('usuarioId', usuarioId).eq('id', id).select('id').maybeSingle())).data); }
   async atualizarEventoCalendario(usuarioId, id, dados) { const { data } = await this.executar(this.criarCliente().from('EventoCalendario').update({ ...dados, atualizadoEm: dataIso() }).eq('id', id).eq('usuarioId', usuarioId).select().maybeSingle()); return data; }
   async criarRegistroSincronizacao(dados) { return this.inserir('RegistroSincronizacao', { id: criarId('sync'), iniciadoEm: dataIso(), ...dados, ...(dados.finalizadoEm ? { finalizadoEm: dataIso(dados.finalizadoEm) } : {}) }); }
   async contarTarefas(usuarioId, filtros = {}) {

@@ -70,3 +70,46 @@ test('usa o telefone alternativo em JIDs privados e ignora grupos', async () => 
   assert.equal(entradas.length, 1);
   assert.equal(entradas[0].telefone, '5511999999999');
 });
+
+test('aceita envelope alternativo da Evolution e tenta novamente após falha', async () => {
+  let evento = null;
+  let tentativas = 0;
+  const repositorio = {
+    async registrarEventoWebhook(dados) {
+      if (evento) return { duplicado: true, evento };
+      evento = { id: 'evento-flexivel', statusProcessamento: 'recebido', ...dados };
+      return { duplicado: false, evento };
+    },
+    async atualizarEventoWebhook(id, dados) {
+      Object.assign(evento, dados);
+      return evento;
+    }
+  };
+  const servicoAssistente = {
+    async processarEntrada() {
+      tentativas += 1;
+      if (tentativas === 1) throw new Error('falha temporária');
+      return { resposta: 'ok' };
+    }
+  };
+  const controlador = criarControladorWebhook({ repositorio, filaMensagens: { async add() {} }, servicoAssistente });
+  const corpo = [{
+    type: 'MESSAGES_UPSERT', instanceName: 'assistente-academico', timestamp: '2026-10-05T17:00:00.000Z', apiKey: 'segredo-que-nao-pode-ser-persistido',
+    data: { data: { key: { id: 'mensagem-flexivel', remoteJid: '5511999999999@s.whatsapp.net', fromMe: false }, message: { conversation: 'quero estudar normalização' } } }
+  }];
+
+  const primeira = criarResposta();
+  await controlador.evolution({ body: corpo }, primeira);
+  assert.equal(primeira.statusCode, 202);
+  assert.equal(evento.statusProcessamento, 'falhou');
+  assert.equal(evento.dados.apikey, undefined);
+  assert.equal(evento.dados.apiKey, undefined);
+  assert.equal(evento.dados.data.message, undefined);
+
+  const segunda = criarResposta();
+  await controlador.evolution({ body: corpo }, segunda);
+  assert.equal(segunda.statusCode, 200);
+  assert.equal(segunda.corpo.reprocessado, true);
+  assert.equal(evento.statusProcessamento, 'concluido');
+  assert.equal(tentativas, 2);
+});

@@ -18,7 +18,11 @@ function proximoResumoInicial(usuario, agora = new Date()) {
 
 function proximoResumoDiario(usuario, agora = new Date()) {
   const fuso = fusoDoUsuario(usuario);
-  return dataHorarioNoFuso(somarDias(dataNoFuso(agora, fuso), 1), horarioDoUsuario(usuario), fuso);
+  let data = somarDias(dataNoFuso(agora, fuso), 1);
+  if (usuario.frequenciaResumo === 'dias_uteis') {
+    while ([0, 6].includes(new Date(`${data}T12:00:00Z`).getUTCDay())) data = somarDias(data, 1);
+  }
+  return dataHorarioNoFuso(data, horarioDoUsuario(usuario), fuso);
 }
 
 function formatarPrazo(dataEntrega, horarioEntrega, fuso) {

@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const pinoHttp = require('pino-http');
 const ambiente = require('./configuracao/ambiente');
+ambiente.validarAmbienteProducao();
 const logger = require('./configuracao/logger');
 const { serializarRequisicao } = logger;
 const { repositorio } = require('./repositorios/repositorio-dados');
@@ -15,6 +16,7 @@ const { ServicoLembretes } = require('./servicos/servico-lembretes');
 const { ServicoAssistente } = require('./servicos/servico-assistente');
 const { criarRotas } = require('./rotas/api');
 const { tratarErros } = require('./intermediarios/seguranca');
+const { criarStoreRedis } = require('./intermediarios/rate-limit-redis');
 
 function criarAplicacao(dependencias = {}) {
   const app = express();
@@ -37,8 +39,8 @@ function criarAplicacao(dependencias = {}) {
     logger,
     serializers: { req: serializarRequisicao }
   }));
-  app.use(rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: true, legacyHeaders: false }));
-  app.use('/api', criarRotas({ ...servicos, filaMensagens: servicos.filas.mensagens }));
+  app.use(rateLimit({ windowMs: 60 * 1000, limit: 120, standardHeaders: true, legacyHeaders: false, store: criarStoreRedis('global'), passOnStoreError: false }));
+  app.use('/api', criarRotas({ ...servicos, filaMensagens: servicos.filas.mensagens, filaWhatsapp: servicos.filas.whatsapp }));
   app.use((req, res) => res.status(404).json({ erro: 'Rota não encontrada' }));
   app.use(tratarErros);
   return { app, servicos };

@@ -22,15 +22,16 @@ class PropostaIA(BaseModel):
     model_config = ConfigDict(extra="forbid")
     intent: Literal["create_task", "create_subject", "edit_task", "complete_task", "delete_task",
                     "list_pending", "list_today", "list_week", "next_exam", "list_overdue",
-                    "list_subjects", "get_reminder_time", "set_reminder_time", "unknown"]
+                    "list_subjects", "get_reminder_time", "set_reminder_time", "general_chat", "unknown"]
     confidence: float = Field(ge=0, le=1)
     title: str | None = Field(max_length=180)
     subject: str | None = Field(max_length=120)
     dueDate: str | None = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
     dueTime: str | None = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
-    type: Literal["exam", "assignment", "task", "class", "appointment", "other"]
+    type: Literal["exam", "assignment", "task", "study", "class", "appointment", "other"]
     reference: str | None = Field(max_length=300)
     reminderTime: str | None = Field(pattern=r"^([01]\d|2[0-3]):[0-5]\d$")
+    response: str | None = Field(default=None, max_length=600)
 
 
 def contexto_minimo(req):
@@ -99,7 +100,12 @@ def processar(req, transporte=None):
         geracao.update(status="complete", model=resposta.get("model", modelo),
                        providerId=resposta.get("id"), usage=resposta.get("usage", {}),
                        result=proposta.model_dump())
-        if proposta.intent == "unknown" or proposta.confidence < 0.65:
+        if proposta.confidence < 0.65:
+            return resultado("unknown", response=FORA_ESCOPO, generation=geracao)
+        if proposta.intent == "general_chat":
+            return resultado("general_chat", confidence=proposta.confidence,
+                             response=proposta.response or FORA_ESCOPO, generation=geracao)
+        if proposta.intent == "unknown":
             return resultado("unknown", response=FORA_ESCOPO, generation=geracao)
         tarefa = None
         if proposta.intent in ("create_task", "edit_task"):

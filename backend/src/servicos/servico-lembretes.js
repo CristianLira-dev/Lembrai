@@ -4,9 +4,20 @@ const {
   proximoResumoDiario,
   proximoResumoInicial
 } = require('../utilitarios/resumo-pendencias');
+const { partesNoFuso } = require('../utilitarios/datas');
+const { filas } = require('../filas/filas');
 
 const MENSAGEM_INATIVIDADE = 'Estamos sentindo sua falta… 😢 continue registrando suas atividades para não perder tarefas importantes';
 const DIAS_INATIVIDADE = 14;
+
+function emHorarioSilencioso(usuario, agora = new Date()) {
+  if (!usuario?.horarioSilencioInicio || !usuario?.horarioSilencioFim) return false;
+  const partes = partesNoFuso(agora, usuario.fusoHorario || 'America/Sao_Paulo');
+  const atual = `${partes.hour}:${partes.minute}`;
+  const inicio = usuario.horarioSilencioInicio;
+  const fim = usuario.horarioSilencioFim;
+  return inicio <= fim ? atual >= inicio && atual < fim : atual >= inicio || atual < fim;
+}
 
 class ServicoLembretes {
   constructor({ repositorio, servicoWhatsapp }) {
@@ -24,6 +35,7 @@ class ServicoLembretes {
   async excluir(usuarioId, id) { return this.repositorio.excluirLembrete(usuarioId, id); }
 
   async agendarResumoInicial(usuario, agora = new Date()) {
+    if (usuario.notificacoesAtivas === false || usuario.frequenciaResumo === 'desativado') return null;
     if (usuario.proximoResumoPendenciasEm) {
       const proximoAgendado = new Date(usuario.proximoResumoPendenciasEm);
       if (usuario.ultimoResumoPendenciasEm) {
@@ -46,6 +58,7 @@ class ServicoLembretes {
 
     for (const usuario of usuarios) {
       const proximo = await this.agendarResumoInicial(usuario, agora);
+      if (!proximo) continue;
       if (proximo > agora) {
         resultado.agendados += 1;
         continue;
@@ -99,6 +112,17 @@ class ServicoLembretes {
       return { ignorado: true, motivo: 'tarefa_nao_pendente' };
     }
     const usuario = await this.repositorio.buscarUsuarioPorId(lembrete.usuarioId);
+    if (usuario?.notificacoesAtivas === false) {
+      await this.repositorio.atualizarLembrete(lembrete.usuarioId, lembrete.id, { status: 'cancelado' });
+      return { ignorado: true, motivo: 'notificacoes_desativadas' };
+    }
+    if (emHorarioSilencioso(usuario)) {
+      let reagendado = new Date(Date.now() + 30 * 60000);
+      for (let i = 0; i < 48 && emHorarioSilencioso(usuario, reagendado); i += 1) reagendado = new Date(reagendado.getTime() + 30 * 60000);
+      await this.repositorio.atualizarLembrete(lembrete.usuarioId, lembrete.id, { agendadoPara: reagendado });
+      await filas.lembretes.add('enviar-lembrete', { lembreteId: lembrete.id }, { delay: Math.max(0, reagendado - Date.now()), jobId: `lembrete-${lembrete.id}-${reagendado.getTime()}` });
+      return { ignorado: true, motivo: 'horario_silencioso', reagendadoPara: reagendado };
+    }
     try {
       const prazo = new Date(tarefa.dataEntrega).toLocaleDateString('pt-BR', { timeZone: usuario.fusoHorario || 'America/Sao_Paulo' });
       await this.servicoWhatsapp.enviarResposta(usuario.telefone, `🔔 ${tarefa.titulo} — ${tarefa.materia || 'atividade'} — entrega ${prazo}.
@@ -112,4 +136,4 @@ Quando terminar, me avisa por aqui!`);
   }
 }
 
-module.exports = { ServicoLembretes, MENSAGEM_INATIVIDADE, DIAS_INATIVIDADE };
+module.exports = { ServicoLembretes, MENSAGEM_INATIVIDADE, DIAS_INATIVIDADE, emHorarioSilencioso };

@@ -1,16 +1,20 @@
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
-const { criarAutenticador, validarSegredoWebhook } = require('../intermediarios/seguranca');
+const { criarAutenticador, autorizarAdministrador, validarSegredoWebhook } = require('../intermediarios/seguranca');
 const { criarServicoAutenticacao } = require('../servicos/servico-autenticacao');
 const { criarControladorAutenticacao } = require('../controladores/autenticacao-controlador');
 const { criarControladorTarefas } = require('../controladores/tarefas-controlador');
 const { criarControladorLembretes } = require('../controladores/lembretes-controlador');
 const { criarControladorWebhook } = require('../controladores/webhook-controlador');
 const { criarControladorPainel } = require('../controladores/painel-controlador');
+const { criarControladorPreferencias } = require('../controladores/preferencias-controlador');
+const { criarControladorEstudos } = require('../controladores/estudos-controlador');
+const { criarControladorAdmin } = require('../controladores/admin-controlador');
 const { diagnosticoConsultaEvolution } = require('../consulta-mensagens-evolution');
 const { codigoSeguroErroChatbot } = require('../servicos/servico-chatbot');
+const { criarStoreRedis } = require('../intermediarios/rate-limit-redis');
 
-function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCalendarios, filaMensagens, servicoAssistente, servicoAutenticacao = criarServicoAutenticacao(repositorio) }) {
+function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCalendarios, filaMensagens, filaWhatsapp, servicoAssistente, servicoWhatsapp, servicoAutenticacao = criarServicoAutenticacao(repositorio, undefined, undefined, undefined, servicoWhatsapp) }) {
   const rotas = express.Router();
   const autenticar = criarAutenticador(servicoAutenticacao);
   const autenticacao = criarControladorAutenticacao(servicoAutenticacao);
@@ -18,12 +22,17 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   const lembretes = criarControladorLembretes(servicoLembretes);
   const webhook = criarControladorWebhook({ repositorio, filaMensagens, servicoAssistente });
   const painel = criarControladorPainel({ repositorio, servicoCalendarios });
+  const preferencias = criarControladorPreferencias({ repositorio, servicoAutenticacao });
+  const estudos = criarControladorEstudos({ repositorio });
+  const admin = criarControladorAdmin({ repositorio, filaWhatsapp });
   const limitarAutenticacao = rateLimit({
     windowMs: 10 * 60 * 1000,
     limit: 20,
     standardHeaders: 'draft-7',
     legacyHeaders: false,
-    message: { erro: 'Muitas tentativas. Aguarde um pouco e tente novamente.' }
+    message: { erro: 'Muitas tentativas. Aguarde um pouco e tente novamente.' },
+    store: criarStoreRedis('autenticacao'),
+    passOnStoreError: false
   });
 
   rotas.use('/autenticacao', (req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
@@ -51,6 +60,21 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   rotas.get('/conversas', autenticar, painel.conversas);
   rotas.get('/conversas/:id/mensagens', autenticar, painel.mensagens);
 
+  rotas.get('/preferencias', autenticar, preferencias.obter);
+  rotas.patch('/preferencias', autenticar, preferencias.atualizar);
+  rotas.get('/privacidade/exportar', autenticar, preferencias.exportar);
+  rotas.post('/privacidade/excluir-conta', autenticar, preferencias.solicitarExclusao);
+
+  rotas.get('/estudos/planos', autenticar, estudos.listar);
+  rotas.post('/estudos/planos', autenticar, estudos.criar);
+  rotas.patch('/estudos/planos/:id', autenticar, estudos.atualizar);
+  rotas.post('/estudos/sessoes', autenticar, estudos.criarSessao);
+  rotas.post('/estudos/sessoes/:id/concluir', autenticar, estudos.concluirSessao);
+
+  rotas.get('/admin/diagnostico', autenticar, autorizarAdministrador, admin.diagnostico);
+  rotas.post('/admin/webhooks/:id/reprocessar', autenticar, autorizarAdministrador, admin.reprocessar);
+  rotas.post('/admin/broadcast', autenticar, autorizarAdministrador, admin.broadcast);
+
   rotas.get('/calendarios/conexoes', autenticar, painel.conexoesCalendario);
   rotas.get('/calendarios/:provedor/conectar', autenticar, painel.conectarCalendario);
   rotas.get('/calendarios/:provedor/retorno', painel.retornoCalendario);
@@ -58,14 +82,14 @@ function criarRotas({ repositorio, servicoTarefas, servicoLembretes, servicoCale
   rotas.post('/calendarios/:provedor/sincronizar', autenticar, painel.sincronizarCalendario);
 
   rotas.post('/webhooks/evolution', validarSegredoWebhook, webhook.evolution);
-  rotas.post('/webhooks/evolution/simular', validarSegredoWebhook, webhook.simular);
+  if (process.env.AMBIENTE !== 'producao') rotas.post('/webhooks/evolution/simular', validarSegredoWebhook, webhook.simular);
   rotas.get('/saude', (req, res) => res.json({ status: 'ok', servico: 'backend', data: new Date().toISOString() }));
-  rotas.get('/saude/evolution', (req, res) => res.json({
+  rotas.get('/saude/evolution', autenticar, autorizarAdministrador, (req, res) => res.json({
     status: diagnosticoConsultaEvolution.codigoErro ? 'degradado' : 'ok',
     servico: 'evolution-polling',
     ...diagnosticoConsultaEvolution
   }));
-  rotas.get('/saude/chatbot', async (req, res) => {
+  rotas.get('/saude/chatbot', autenticar, autorizarAdministrador, async (req, res) => {
     try {
       const resultado = await servicoAssistente.servicoChatbot.diagnosticar();
       return res.json({ status: 'ok', servico: 'chatbot', conectado: resultado?.status === 'ok' });

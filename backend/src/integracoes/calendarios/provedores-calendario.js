@@ -13,6 +13,15 @@ class ProvedorCalendarioSimulado {
 }
 
 class ProvedorGoogleCalendar {
+  async renovarToken(refreshToken) {
+    const resposta = await axios.post('https://oauth2.googleapis.com/token', new URLSearchParams({ refresh_token: refreshToken, client_id: ambiente.google.clientId, client_secret: ambiente.google.clientSecret, grant_type: 'refresh_token' }), { timeout: 10000, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    return { accessToken: resposta.data.access_token, refreshToken, expiraEm: new Date(Date.now() + resposta.data.expires_in * 1000) };
+  }
+  async excluirEvento(id, tokens, calendarId = 'primary') { await axios.delete(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(id)}`, { timeout: 10000, headers: { Authorization: `Bearer ${tokens.accessToken}` } }); return { removido: true }; }
+  async sincronizar(tokens, desde = new Date(Date.now() - 30 * 86400000)) {
+    const resposta = await axios.get('https://www.googleapis.com/calendar/v3/calendars/primary/events', { timeout: 12000, headers: { Authorization: `Bearer ${tokens.accessToken}` }, params: { timeMin: desde.toISOString(), singleEvents: true, maxResults: 2500 } });
+    return (resposta.data.items || []).map((e) => ({ id: e.id, titulo: e.summary, descricao: e.description || null, inicio: e.start?.dateTime || e.start?.date, fim: e.end?.dateTime || e.end?.date, atualizadoEm: e.updated, cancelado: e.status === 'cancelled' }));
+  }
   async atualizarEvento(id, evento, tokens, calendarId = 'primary') {
     const resposta = await axios.patch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(id)}`, { summary: evento.titulo, description: evento.descricao, start: { dateTime: evento.dataInicio, timeZone: evento.fusoHorario }, end: { dateTime: evento.dataFim, timeZone: evento.fusoHorario } }, { timeout: 10000, headers: { Authorization: `Bearer ${tokens.accessToken}` } });
     return { externalEventId: resposta.data.id };
@@ -35,6 +44,16 @@ class ProvedorGoogleCalendar {
 }
 
 class ProvedorOutlookCalendar {
+  async renovarToken(refreshToken) {
+    const resposta = await axios.post('https://login.microsoftonline.com/common/oauth2/v2.0/token', new URLSearchParams({ refresh_token: refreshToken, client_id: ambiente.outlook.clientId, client_secret: ambiente.outlook.clientSecret, grant_type: 'refresh_token', scope: 'offline_access Calendars.ReadWrite' }), { timeout: 10000, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } });
+    return { accessToken: resposta.data.access_token, refreshToken: resposta.data.refresh_token || refreshToken, expiraEm: new Date(Date.now() + resposta.data.expires_in * 1000) };
+  }
+  async excluirEvento(id, tokens) { await axios.delete(`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(id)}`, { timeout: 10000, headers: { Authorization: `Bearer ${tokens.accessToken}` } }); return { removido: true }; }
+  async sincronizar(tokens, desde = new Date(Date.now() - 30 * 86400000)) {
+    const fim = new Date(Date.now() + 365 * 86400000);
+    const resposta = await axios.get('https://graph.microsoft.com/v1.0/me/calendarView', { timeout: 12000, headers: { Authorization: `Bearer ${tokens.accessToken}`, Prefer: 'outlook.timezone="UTC"' }, params: { startDateTime: desde.toISOString(), endDateTime: fim.toISOString(), '$top': 1000 } });
+    return (resposta.data.value || []).map((e) => ({ id: e.id, titulo: e.subject, descricao: e.bodyPreview || null, inicio: e.start?.dateTime, fim: e.end?.dateTime, atualizadoEm: e.lastModifiedDateTime, cancelado: e.isCancelled }));
+  }
   async atualizarEvento(id, evento, tokens) {
     const resposta = await axios.patch(`https://graph.microsoft.com/v1.0/me/events/${encodeURIComponent(id)}`, { subject: evento.titulo, body: { contentType: 'Text', content: evento.descricao || '' }, start: { dateTime: evento.dataInicio, timeZone: evento.fusoHorario }, end: { dateTime: evento.dataFim, timeZone: evento.fusoHorario } }, { timeout: 10000, headers: { Authorization: `Bearer ${tokens.accessToken}` } });
     return { externalEventId: resposta.data.id };
