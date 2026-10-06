@@ -18,6 +18,7 @@ const ambiente = {
   urlBackend: process.env.URL_BACKEND || 'http://localhost:3000',
   corsOrigens: lista(process.env.CORS_ORIGENS, 'http://localhost:5173'),
   redis: process.env.REDIS_URL || 'redis://localhost:6379',
+  redisConfigurado: Boolean(process.env.REDIS_URL),
   supabaseUrl: process.env.SUPABASE_URL || '',
   supabaseChavePublica: process.env.SUPABASE_PUBLISHABLE_KEY || '',
   supabaseChaveSecreta: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || '',
@@ -40,7 +41,10 @@ const ambiente = {
   evolutionInstancia: process.env.EVOLUTION_API_INSTANCIA || 'assistente-academico',
   evolutionWebhookSegredo: process.env.EVOLUTION_WEBHOOK_SEGREDO || 'desenvolvimento-webhook',
   modoWhatsapp: process.env.MODO_WHATSAPP || 'simulado',
-  exigirRedis: process.env.EXIGIR_REDIS === 'true' || process.env.AMBIENTE === 'producao',
+  // A API continua operando em modo compatível (filas e agendador locais) quando
+  // o serviço ainda não recebeu Redis. Os processos distribuídos devem definir
+  // EXIGIR_REDIS=true e falham cedo se a infraestrutura estiver incompleta.
+  exigirRedis: process.env.EXIGIR_REDIS === 'true',
   adminToken: process.env.ADMIN_TOKEN || '',
   retencaoMensagensDias: Number(process.env.RETENCAO_MENSAGENS_DIAS || 90),
   resend: {

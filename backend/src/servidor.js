@@ -47,8 +47,8 @@ function criarAplicacao(dependencias = {}) {
 }
 
 const construida = criarAplicacao();
-if (require.main === module) {
-  construida.app.listen(ambiente.porta, async () => {
+function iniciarServidor() {
+  return construida.app.listen(ambiente.porta, async () => {
     logger.info({ porta: ambiente.porta }, 'backend iniciado');
 
     if (ambiente.modoWhatsapp !== 'evolution') return;
@@ -63,4 +63,6 @@ if (require.main === module) {
   });
 }
 
-module.exports = { criarAplicacao, ...construida };
+if (require.main === module) iniciarServidor();
+
+module.exports = { criarAplicacao, iniciarServidor, ...construida };

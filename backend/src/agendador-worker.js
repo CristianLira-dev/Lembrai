@@ -1,3 +1,5 @@
+process.env.EXIGIR_REDIS = 'true';
+
 const crypto = require('node:crypto');
 const ambiente = require('./configuracao/ambiente');
 const logger = require('./configuracao/logger');

@@ -23,7 +23,7 @@ class RateLimitRedisStore {
 }
 
 function criarStoreRedis(prefixo) {
-  return ambiente.ambiente === 'producao' ? new RateLimitRedisStore(prefixo) : undefined;
+  return ambiente.redisConfigurado ? new RateLimitRedisStore(prefixo) : undefined;
 }
 
 module.exports = { RateLimitRedisStore, criarStoreRedis };

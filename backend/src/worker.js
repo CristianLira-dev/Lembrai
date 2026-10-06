@@ -1,3 +1,5 @@
+process.env.EXIGIR_REDIS = 'true';
+
 const logger = require('./configuracao/logger');
 const ambiente = require('./configuracao/ambiente');
 ambiente.validarAmbienteProducao();

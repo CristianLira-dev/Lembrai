@@ -9,7 +9,7 @@
     "desenvolvimento:memoria": "node scripts/servidor-memoria.js",
     "desenvolvimento:sem-redis": "node scripts/servidor-sem-redis.js",
     "inicio": "node src/servidor.js",
-    "start": "node src/servidor.js",
+    "start": "node scripts/iniciar-producao.js",
     "start:worker": "node src/worker.js",
     "start:scheduler": "node src/agendador-worker.js",
     "worker": "node src/worker.js",
