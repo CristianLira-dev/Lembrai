@@ -20,7 +20,7 @@
     "@supabase/supabase-js": "2.115.0",
     "axios": "^1.20.0",
     "bcryptjs": "^3.0.2",
-    "bullmq": "^5.52.2",
+    "bullmq": "^6.3.11",
     "cors": "^2.8.5",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
