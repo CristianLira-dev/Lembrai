@@ -58,4 +58,4 @@ jobs:
         run: |
           ! git ls-files | grep -E '(^|/)\.env($|\.)'
           ! git ls-files | grep -E '^supabase/'
-          ! git grep -nE '(service_role|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|sk_live_)' -- ':!package-lock.json'
+          ! git grep -nE '(service_role|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY|sk_live_)' -- ':!package-lock.json' ':!.github/workflows/ci.yml'
