@@ -59,7 +59,7 @@ function Header() {
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { const atualizar = () => setScrolled(window.scrollY > 22); window.addEventListener('scroll', atualizar, { passive: true }); atualizar(); return () => window.removeEventListener('scroll', atualizar); }, []);
   const fechar = () => setMenuOpen(false);
-  return <header className={`landing-header ${scrolled ? 'scrolled' : ''}`}><div className="landing-container header-inner"><a href="#produto" onClick={fechar} aria-label="Ir para o início"><LogoPlaceholder /></a><nav className={menuOpen ? 'landing-nav open' : 'landing-nav'} aria-label="Navegação principal"><a href="#produto" onClick={fechar}>Produto</a><a href="#como-funciona" onClick={fechar}>Como funciona</a><a href="#recursos" onClick={fechar}>Recursos</a><a href="#precos" onClick={fechar}>Preços</a><a href="#faq" onClick={fechar}>FAQ</a></nav><div className="header-actions"><Link className="landing-button small primary" to="/cadastro">Começar agora <Icon name="arrow" size={14} /></Link><button className="mobile-menu-button" type="button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'} aria-expanded={menuOpen}><Icon name={menuOpen ? 'close' : 'menu'} size={20} /></button></div></div></header>;
+  return <header className={`landing-header ${scrolled ? 'scrolled' : ''}`}><div className="landing-container header-inner"><a href="#produto" onClick={fechar} aria-label="Ir para o início"><LogoPlaceholder /></a><nav className={menuOpen ? 'landing-nav open' : 'landing-nav'} aria-label="Navegação principal"><a href="#produto" onClick={fechar}>Produto</a><a href="#como-funciona" onClick={fechar}>Como funciona</a><a href="#recursos" onClick={fechar}>Recursos</a><a href="#precos" onClick={fechar}>Preços</a><a href="#faq" onClick={fechar}>FAQ</a></nav><div className="header-actions"><Link className="header-login" to="/entrada">Entrar</Link><Link className="landing-button small primary" to="/cadastro">Começar agora <Icon name="arrow" size={14} /></Link><button className="mobile-menu-button" type="button" onClick={() => setMenuOpen(!menuOpen)} aria-label={menuOpen ? 'Fechar menu' : 'Abrir menu'} aria-expanded={menuOpen}><Icon name={menuOpen ? 'close' : 'menu'} size={20} /></button></div></div></header>;
 }
 
 function Reveal({ children, className = '' }) {
@@ -67,20 +67,19 @@ function Reveal({ children, className = '' }) {
 }
 
 const recursos = [
-  { icon: 'chat', title: 'WhatsApp', text: 'Organize tudo conversando naturalmente com o assistente.' },
-  { icon: 'brain', title: 'Inteligência artificial', text: 'Entenda datas, horários, matérias e tarefas sem comandos rígidos.' },
-  { icon: 'calendar', title: 'Calendários', text: 'Conecte suas agendas e mantenha tudo no lugar certo.' },
-  { icon: 'bell', title: 'Lembretes', text: 'Receba um aviso antes de perder um prazo importante.' },
-  { icon: 'book', title: 'Organização acadêmica', text: 'Provas, trabalhos e compromissos em uma só visão.' },
-  { icon: 'bolt', title: 'Captura instantânea', text: 'Você não precisa abrir um aplicativo para registrar uma tarefa.' }
+  { icon: 'chat', title: 'Direto no WhatsApp', text: 'Registre uma tarefa sem abrir mais um aplicativo.', detalhe: '“Tenho prova de Cálculo na sexta.”', classe: 'wide' },
+  { icon: 'brain', title: 'Entende o contexto', text: 'A Lembraí identifica matéria, data e tipo de compromisso.', detalhe: 'Cálculo · prova · sexta', classe: 'tall' },
+  { icon: 'bell', title: 'Lembretes na hora certa', text: 'Escolha com antecedência você quer ser avisado.', detalhe: 'Avisar 2 dias antes', classe: 'compact' },
+  { icon: 'calendar', title: 'Uma agenda só', text: 'Sincronize o que importa e visualize o seu semestre.', detalhe: 'Google · Outlook · ICS', classe: 'compact' },
+  { icon: 'book', title: 'Feito para a rotina acadêmica', text: 'Trabalhos, provas e entregas em uma visão feita para quem estuda.', detalhe: '3 prazos nesta semana', classe: 'wide accent' }
 ];
 
 const perguntas = [
   ['O assistente funciona pelo WhatsApp?', 'Sim. O WhatsApp é o principal canal de interação com o assistente.'],
   ['Preciso instalar algum aplicativo?', 'Não. A experiência principal acontece pelo WhatsApp e o painel web acompanha tudo.'],
-  ['Posso conectar meu calendário?', 'Sim. O sistema foi pensado para trabalhar com diferentes serviços de calendário.'],
+  ['Posso conectar meu calendário?', 'Sim. Você pode conectar Google Calendar, Outlook e outros calendários compatíveis via ICS/WebCal.'],
   ['O assistente entende mensagens naturais?', 'Sim. Você pode escrever normalmente, como falaria com uma pessoa.'],
-  ['Quanto custa?', 'O primeiro mês é gratuito. Depois, o plano passa a custar R$ 19,99/mês.'],
+  ['Quanto custa?', 'Você começa com 1 mês grátis. Depois, a Lembraí custa R$ 9,99 por mês.'],
   ['Posso cancelar?', 'Sim. O usuário pode cancelar a assinatura conforme as condições apresentadas no processo de contratação.']
 ];
 
@@ -128,12 +127,12 @@ export function PaginaLanding() {
           <span className="eyebrow-pulse" /> Assistente acadêmico no WhatsApp
         </p>
         <h1>
-          Você fala.
+          Você manda no
           <br />
-          <span>O assistente organiza.</span>
+          <span>WhatsApp. A Lembraí organiza.</span>
         </h1>
         <p className="hero-subtitle">
-          Seu assistente acadêmico inteligente direto no WhatsApp. Organize tarefas, provas e trabalhos, conecte suas agendas e receba lembretes antes dos prazos.
+          Transforme uma mensagem rápida em uma tarefa organizada, com prazo, matéria e lembrete para você não perder mais nada.
         </p>
         <div className="hero-actions">
           <Link className="landing-button primary" to="/cadastro">
@@ -210,7 +209,7 @@ export function PaginaLanding() {
           </span>
           <span>
             <strong>Calendários</strong>
-            <small>Google · Outlook · Apple</small>
+            <small>Google · Outlook · ICS</small>
           </span>
         </div>
         <div>
@@ -236,6 +235,36 @@ export function PaginaLanding() {
           </span>
         </div>
       </div>
+    </div>
+  </section>
+
+  <section className="problem-section landing-section">
+    <div className="landing-container problem-grid">
+      <Reveal>
+        <p className="landing-eyebrow">A correria não avisa</p>
+        <h2>
+          A faculdade espalha.
+          <br />
+          <span>Você merece uma visão só.</span>
+        </h2>
+      </Reveal>
+      <Reveal className="problem-copy">
+        <p>Entre grupos, avisos, aulas e prazos, não faltam tarefas: falta um lugar confiável que lembre por você.</p>
+        <div className="problem-quotes">
+          <span>“Eu jurava que era semana que vem.”</span>
+          <span>“Onde eu anotei esse trabalho?”</span>
+          <span>“Tinha prova hoje?”</span>
+        </div>
+        <div className="solution-callout">
+          <span className="solution-mark">
+            <Icon name="spark" size={15} />
+          </span>
+          <span>
+            <strong>Falou. Anotou. Organizou.</strong>
+            <small>A Lembraí transforma mensagens rápidas em um plano que você consegue acompanhar.</small>
+          </span>
+        </div>
+      </Reveal>
     </div>
   </section>
 
@@ -324,37 +353,6 @@ export function PaginaLanding() {
     </div>
   </section>
 
-  <section className="problem-section landing-section">
-    <div className="landing-container problem-grid">
-      <Reveal>
-        <p className="landing-eyebrow">O problema</p>
-        <h2>
-          A faculdade não avisa
-          <br />
-          <span>quando você esquece.</span>
-        </h2>
-      </Reveal>
-      <Reveal className="problem-copy">
-        <p>Você não precisa de mais um lugar para visitar. Precisa de um lugar que lembre por você.</p>
-        <div className="problem-quotes">
-          <span>“Eu jurava que era semana que vem.”</span>
-          <span>“Esqueci completamente desse trabalho.”</span>
-          <span>“Onde eu anotei isso?”</span>
-          <span>“Tinha prova hoje?”</span>
-        </div>
-        <div className="solution-callout">
-          <span className="solution-mark">
-            <Icon name="spark" size={15} />
-          </span>
-          <span>
-            <strong>A Lembraí transforma mensagens rápidas</strong>
-            <small>em compromissos organizados e lembretes automáticos.</small>
-          </span>
-        </div>
-      </Reveal>
-    </div>
-  </section>
-
   <section className="features-section landing-section" id="recursos">
     <div className="landing-container">
       <Reveal className="section-intro">
@@ -364,16 +362,17 @@ export function PaginaLanding() {
           <br />
           <span>da sua faculdade.</span>
         </h2>
-        <p>Menos tempo organizando. Mais tempo vivendo o semestre.</p>
+        <p>Ferramentas simples, com contexto acadêmico de verdade — sem transformar sua rotina em outro trabalho.</p>
       </Reveal>
       <div className="features-grid">
         {recursos.map((recurso) => (
-          <Reveal className="feature-card" key={recurso.title}>
+          <Reveal className={`feature-card ${recurso.classe}`} key={recurso.title}>
             <span className="feature-icon">
               <Icon name={recurso.icon} size={20} />
             </span>
             <h3>{recurso.title}</h3>
             <p>{recurso.text}</p>
+            <span className="feature-detail">{recurso.detalhe}</span>
             <span className="feature-arrow">
               <Icon name="arrow" size={15} />
             </span>
@@ -386,15 +385,15 @@ export function PaginaLanding() {
   <section className="calendar-section landing-section">
     <div className="landing-container calendar-grid">
       <Reveal className="calendar-copy">
-        <p className="landing-eyebrow">Calendários conectados</p>
+        <p className="landing-eyebrow">Integrações que acompanham você</p>
         <h2>
-          Todas as suas agendas.
+          A sua agenda.
           <br />
-          <span>Um único assistente.</span>
+          <span>Sem duplicar o esforço.</span>
         </h2>
-        <p>Seus compromissos ficam sincronizados para você não precisar conferir três lugares diferentes.</p>
+        <p>Conecte Google Calendar, Outlook ou um calendário via ICS/WebCal. A Lembraí deixa suas entregas no mesmo ritmo da sua semana.</p>
         <Link className="landing-text-button" to="/cadastro">
-          Conectar meu calendário <Icon name="arrow" size={15} />
+          Ver integrações <Icon name="arrow" size={15} />
         </Link>
       </Reveal>
       <Reveal className="calendar-diagram">
@@ -409,8 +408,8 @@ export function PaginaLanding() {
           <span className="node-plus">+</span>
         </div>
         <div className="calendar-node">
-          <span className="provider-logo apple">A</span>
-          <span>Apple Calendar</span>
+          <span className="provider-logo ics">↗</span>
+          <span>ICS / WebCal</span>
           <span className="node-plus">+</span>
         </div>
         <div className="diagram-line">
@@ -505,33 +504,22 @@ export function PaginaLanding() {
       <Reveal className="section-intro centered">
         <p className="landing-eyebrow">Planos simples</p>
         <h2>
-          Comece sem pensar
+          Um preço simples
           <br />
-          <span>demais.</span>
+          <span>para uma rotina mais leve.</span>
         </h2>
-        <p>Um mês para sentir a diferença. Depois, você decide.</p>
-      </Reveal>
-      <Reveal className="beta-notice">
-        <span className="beta-notice-icon">
-          <Icon name="spark" size={19} />
-        </span>
-        <div>
-          <strong>Fase beta com acesso gratuito</strong>
-          <p>
-            A Lembraí ainda está em desenvolvimento e disponível gratuitamente durante a fase de testes. Nas próximas atualizações, os planos pagos serão liberados, e os usuários beta receberão benefícios e descontos exclusivos na versão paga.
-          </p>
-        </div>
+        <p>Você tem um mês para sentir a diferença. Depois, continua apenas se fizer sentido para você.</p>
       </Reveal>
       <div className="pricing-grid">
         <Reveal className="price-card">
-          <p className="price-label">Plano 01</p>
-          <h3>Grátis</h3>
-          <p className="price-description">Experimente o assistente gratuitamente por 1 mês.</p>
+          <p className="price-label">Plano 01 · Começo</p>
+          <h3>Teste gratuito</h3>
+          <p className="price-description">Um mês completo para colocar sua rotina em ordem.</p>
           <div className="price-value">
             <strong>R$ 0</strong>
             <span>no primeiro mês</span>
           </div>
-          <p className="price-note">1 mês grátis. Depois, R$ 9,99/mês.</p>
+          <p className="price-note">Sem cartão para começar.</p>
           <Link className="landing-button secondary full" to="/cadastro">
             Começar grátis <Icon name="arrow" size={15} />
           </Link>
@@ -548,17 +536,17 @@ export function PaginaLanding() {
           </ul>
         </Reveal>
         <Reveal className="price-card featured">
-          <span className="price-ribbon">Mais completo</span>
-          <p className="price-label">Plano 02</p>
-          <h3>Pro</h3>
-          <p className="price-description">Tudo o que você precisa para nunca mais perder um prazo.</p>
+          <span className="price-ribbon">Depois do teste</span>
+          <p className="price-label">Plano 02 · Lembraí</p>
+          <h3>Lembraí mensal</h3>
+          <p className="price-description">Continue com a rotina organizada, sem planos confusos ou recursos escondidos.</p>
           <div className="price-value">
-            <strong>R$ 19,99</strong>
+            <strong>R$ 9,99</strong>
             <span>/mês</span>
           </div>
-          <p className="price-note">Comece gratuitamente por 1 mês.</p>
+          <p className="price-note">Ativado somente após o primeiro mês.</p>
           <Link className="landing-button primary full" to="/cadastro">
-            Assinar plano Pro <Icon name="arrow" size={15} />
+            Começar gratuitamente <Icon name="arrow" size={15} />
           </Link>
           <ul>
             <li>
@@ -570,9 +558,7 @@ export function PaginaLanding() {
             <li>
               <Icon name="check" size={14} /> Calendários integrados
             </li>
-            <li>
-              <Icon name="check" size={14} /> Sincronização e recursos avançados
-            </li>
+            <li><Icon name="check" size={14} /> Painel, calendário e lembretes em uma só rotina</li>
           </ul>
         </Reveal>
       </div>
@@ -623,7 +609,7 @@ export function PaginaLanding() {
         <Link className="landing-button primary" to="/cadastro">
           Começar gratuitamente <Icon name="arrow" size={16} />
         </Link>
-        <small>1 mês grátis. Depois R$ 19,99/mês.</small>
+        <small>1 mês grátis. Depois R$ 9,99/mês.</small>
       </div>
       <div className="final-cta-visual">
         <PhoneMockup compact />
