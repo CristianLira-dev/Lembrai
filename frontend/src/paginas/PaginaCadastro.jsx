@@ -51,7 +51,7 @@ export function PaginaCadastro() {
         ...dados,
         telefone
       });
-      navegar('/authcode', { replace: true });
+      navegar('/painel', { replace: true });
     } catch (erroApi) {
       setErro(erroApi.message || 'Não foi possível criar sua conta.');
     } finally {

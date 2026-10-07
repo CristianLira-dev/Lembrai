@@ -56,33 +56,23 @@ function cenario(auth = {}, admin = {}) {
   return { repositorio, servico, controlador: criarControladorAutenticacao(servico), chamadas, chamadasAdmin, emails };
 }
 
-test('cadastro envia código alfanumérico e só confirma e cria perfil após validá-lo', async () => {
+test('cadastro confirma a conta sem enviar e-mail e devolve a sessão', async () => {
   const c = cenario();
   const res = resposta();
   await c.controlador.cadastrar({ body: { ...dados, email: 'ALUNO@example.com', telefone: '+55 (11) 99999-9999' } }, res);
   assert.equal(res.statusCode, 201);
-  assert.equal(res.body.desafio.finalidade, 'cadastro');
-  assert.match(c.emails[0].codigo, /^[A-Z0-9]{5}$/);
+  assert.deepEqual(res.body.sessao, sessao);
+  assert.equal(c.emails.length, 0);
   assert.deepEqual(c.chamadasAdmin[0], {
     operacao: 'criar',
     dados: {
       email: dados.email,
       password: dados.senha,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: 'America/Sao_Paulo' }
     }
   });
-  assert.equal(c.repositorio.usuarios.length, 0);
-  assert.notEqual(c.repositorio.codigosVerificacao[0].codigoHash, c.emails[0].codigo);
-  const confirmado = await c.servico.confirmarCodigo({ desafioId: res.body.desafio.id, codigo: c.emails[0].codigo.toLowerCase() });
-  assert.deepEqual(confirmado, { sessao });
   assert.equal(c.repositorio.usuarios[0].id, identidade.id);
-  assert.ok(c.repositorio.codigosVerificacao[0].usadoEm);
-  assert.ok(c.chamadasAdmin.some((item) => item.operacao === 'atualizar' && item.dados.email_confirm));
-  await assert.rejects(
-    () => c.servico.confirmarCodigo({ desafioId: res.body.desafio.id, codigo: c.emails[0].codigo }),
-    /já utilizado/
-  );
 });
 
 test('valida os campos obrigatórios de cadastro antes de chamar o Auth', async () => {
@@ -93,25 +83,13 @@ test('valida os campos obrigatórios de cadastro antes de chamar o Auth', async 
   assert.equal(c.chamadasAdmin.length, 0);
 });
 
-test('login valida a senha e exige o segundo código antes de devolver a sessão', async () => {
+test('login valida a senha e devolve a sessão sem enviar e-mail', async () => {
   const c = cenario();
   const res = resposta();
   await c.controlador.entrar({ body: { email: dados.email, senha: dados.senha } }, res);
   assert.deepEqual(c.chamadas[0], { email: dados.email, password: dados.senha });
-  assert.equal(res.body.desafio.finalidade, 'entrada');
-  assert.equal(res.body.sessao, undefined);
-  const confirmado = await c.servico.confirmarCodigo({ desafioId: res.body.desafio.id, codigo: c.emails[0].codigo });
-  assert.equal(confirmado.sessao.access_token, 'jwt-do-supabase');
-});
-
-test('remove a conta criada se o envio do código de cadastro falhar', async () => {
-  const c = cenario();
-  c.servico = criarServicoAutenticacao(c.repositorio, () => ({}), () => ({ auth: { admin: {
-    createUser: async () => ({ data: { user: identidade }, error: null }),
-    deleteUser: async (id) => { c.chamadasAdmin.push({ operacao: 'excluir', id }); }
-  } } }), { enviarCodigo: async () => { throw Object.assign(new Error('smtp'), { statusCode: 503 }); } });
-  await assert.rejects(() => c.servico.cadastrar(dados), { statusCode: 503 });
-  assert.ok(c.chamadasAdmin.some((item) => item.operacao === 'excluir' && item.id === identidade.id));
+  assert.deepEqual(res.body.sessao, sessao);
+  assert.equal(c.emails.length, 0);
 });
 
 test('recuperação valida o código antes de alterar a senha', async () => {
@@ -167,26 +145,12 @@ test('recuperação mantém resposta 200 e genérica quando o SMTP falha', async
   assert.ok(c.repositorio.codigosVerificacao[0].usadoEm);
 });
 
-test('reenvia a confirmação somente para cadastro ainda pendente', async () => {
+test('não reenvia confirmação por e-mail para cadastro já confirmado', async () => {
   const c = cenario();
   await c.servico.cadastrar(dados);
   const { desafio } = await c.servico.reenviarConfirmacao({ email: dados.email });
   assert.equal(desafio.finalidade, 'cadastro');
-  assert.equal(c.emails.length, 2);
-  assert.ok(c.repositorio.codigosVerificacao[0].usadoEm);
-});
-
-test('bloqueia o desafio depois de cinco códigos incorretos', async () => {
-  const c = cenario();
-  const { desafio } = await c.servico.entrar(dados);
-  for (let tentativa = 1; tentativa <= 5; tentativa += 1) {
-    await assert.rejects(
-      () => c.servico.confirmarCodigo({ desafioId: desafio.id, codigo: 'AAAAA' }),
-      tentativa === 5 ? /Limite de tentativas/ : /Código inválido/
-    );
-  }
-  assert.equal(c.repositorio.codigosVerificacao[0].tentativas, 5);
-  assert.ok(c.repositorio.codigosVerificacao[0].usadoEm);
+  assert.equal(c.emails.length, 0);
 });
 
 test('traduz credenciais inválidas, e-mail não confirmado, limite e indisponibilidade', async () => {

@@ -99,14 +99,14 @@ export function ProvedorAutenticacao({ children }) {
     exigirSupabase();
     setErroSessao('');
     const resposta = await api.entrar(dados);
-    return salvarDesafio(resposta.data.desafio);
+    return aceitarSessao(resposta.data.sessao);
   }
 
   async function cadastrar(dados) {
     exigirSupabase();
     setErroSessao('');
     const resposta = await api.cadastrar(dados);
-    return salvarDesafio(resposta.data.desafio);
+    return aceitarSessao(resposta.data.sessao);
   }
 
   async function confirmarCodigo(codigo) {

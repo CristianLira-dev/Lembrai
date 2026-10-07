@@ -224,6 +224,13 @@ function criarServicoAutenticacao(
     return data;
   }
 
+  async function criarSessaoComSenha(email, senha) {
+    const { data, error } = await criarCliente().auth.signInWithPassword({ email, password: senha });
+    if (error) throw traduzirErro(error);
+    if (!data.session || !data.user) throw falha('Não foi possível iniciar sua sessão.', 503);
+    return data;
+  }
+
   async function cadastrar(dados) {
     if (await repositorio.buscarUsuarioPorEmail(dados.email)) throw falha('E-mail já cadastrado', 409);
     if (await repositorio.buscarUsuarioPorTelefone(dados.telefone)) throw falha('WhatsApp já cadastrado', 409);
@@ -238,15 +245,19 @@ function criarServicoAutenticacao(
     const { data, error } = await clienteAdmin.auth.admin.createUser({
       email: dados.email,
       password: dados.senha,
-      email_confirm: false,
+      email_confirm: true,
       user_metadata: { nome: dados.nome, telefone: dados.telefone, fusoHorario: dados.fusoHorario }
     });
     if (error) throw traduzirErro(error);
-    if (!data.user?.id) throw falha('Não foi possível preparar a confirmação do cadastro.', 503);
+    if (!data.user?.id) throw falha('Não foi possível criar sua conta.', 503);
     try {
-      return { desafio: await criarDesafio({
-        email: dados.email, nome: dados.nome, finalidade: 'cadastro', usuarioAuthId: data.user.id
-      }) };
+      const autenticacao = await criarSessaoComSenha(dados.email, dados.senha);
+      const perfil = await obterPerfil(autenticacao.user);
+      if (servicoWhatsapp && perfil.telefone) {
+        await servicoWhatsapp.enviarResposta(perfil.telefone, '🎉 Sua conta Lembraí está pronta!\\n\\nVocê pode começar dizendo:\\n• “Tenho prova de Banco de Dados sexta às 19h”\\n• “Quero estudar algoritmos até dia 20”\\n• “Quais são minhas pendências?”').catch(() => {});
+        await repositorio.atualizarUsuario(perfil.id, { onboardingConcluidoEm: new Date(), consentimentoWhatsAppEm: new Date() });
+      }
+      return { sessao: autenticacao.session };
     } catch (erro) {
       await clienteAdmin.auth.admin.deleteUser(data.user.id).catch(() => {});
       throw erro;
@@ -254,16 +265,8 @@ function criarServicoAutenticacao(
   }
 
   async function entrar(dados) {
-    const cliente = criarCliente();
-    const { data, error } = await cliente.auth.signInWithPassword({ email: dados.email, password: dados.senha });
-    if (error) throw traduzirErro(error);
-    if (!data.user?.id || !data.session) throw falha('Não foi possível validar sua conta.', 503);
-    await cliente.auth.signOut({ scope: 'local' }).catch(() => {});
-    const perfil = await repositorio.buscarUsuarioPorId(data.user.id);
-    return { desafio: await criarDesafio({
-      email: dados.email, nome: perfil?.nome || data.user.user_metadata?.nome,
-      finalidade: 'entrada', usuarioAuthId: data.user.id
-    }) };
+    const autenticacao = await criarSessaoComSenha(dados.email, dados.senha);
+    return { sessao: autenticacao.session };
   }
 
   async function confirmarCodigo({ desafioId, codigo }) {

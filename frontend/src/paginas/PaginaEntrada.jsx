@@ -23,7 +23,7 @@ export function PaginaEntrada() {
     setEnviando(true);
     try {
       await entrar(dados);
-      navegar('/authcode', { replace: true });
+      navegar('/painel', { replace: true });
     } catch (erroApi) {
       setErro(erroApi.message);
     } finally {
