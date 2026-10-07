@@ -1392,7 +1392,7 @@ h3 {
     max-width: 650px;
     margin: 0 0 24px;
     color: var(--ds-text);
-    font: 700 clamp(48px, 7vw, 78px)/1.02 'Aeonik Pro', 'Inter', sans-serif;
+    font: 700 clamp(46px, 6.4vw, 70px)/1.02 'Aeonik Pro', 'Inter', sans-serif;
     letter-spacing: -.055em;
 }
 
@@ -3138,7 +3138,7 @@ h3 {
         grid-template-columns: 1fr .9fr;
     }
     .hero-copy h1 {
-        font-size: clamp(44px, 6vw, 65px);
+        font-size: clamp(43px, 5.8vw, 60px);
     }
     .phone-wrap {
         width: 250px;
@@ -3228,7 +3228,7 @@ h3 {
         gap: 55px;
     }
     .hero-copy h1 {
-        font-size: clamp(48px, 14vw, 65px);
+        font-size: clamp(46px, 13vw, 60px);
     }
     .hero-subtitle {
         font-size: 15px;
